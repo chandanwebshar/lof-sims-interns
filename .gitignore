@@ -1,2 +1,3 @@
 .streamlit/secrets.toml
 last_interviewer.mp3
+__pycache__/sim_prompts.cpython-310.pyc

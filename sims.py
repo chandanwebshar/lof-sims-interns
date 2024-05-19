@@ -143,6 +143,7 @@ def check_password():
         return True
 
 st.title("Case Study Framework Generator")
+st.info("Updated 5/19/2024 with Option to Save Cases to the Database for Future Use.")
 init_session()
 
 if check_password():
