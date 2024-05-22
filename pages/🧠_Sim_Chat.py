@@ -180,7 +180,7 @@ if check_password():
     st.sidebar.title('Customization')
     st.session_state.model = st.sidebar.selectbox(
             'Choose a model',
-            ['llama3-70b-8192', 'llama3-8b-8192', 'mixtral-8x7b-32768', 'gemma-7b-it']
+            ['llama3-70b-8192', 'gpt-4o']
         )
         # Initialize chat history
 
@@ -252,17 +252,42 @@ if check_password():
                 st.markdown(prompt)
                 
                 # Display assistant response in chat message container
-            with st.chat_message("assistant", avatar="🤒"):        
-                stream = groq_client.chat.completions.create(
-                    model=st.session_state["model"],
-                    messages=[
-                        {"role": m["role"], "content": m["content"]}
-                        for m in st.session_state.messages
-                    ],
-                    temperature=0.3,
-                    stream=True,
-                )
-                st.session_state.sim_response = st.write_stream(parse_groq_stream(stream))
+            with st.chat_message("assistant", avatar="🤒"):    
+                if st.session_state.model == "llama3-70b-8192":    
+                    stream = groq_client.chat.completions.create(
+                        model=st.session_state["model"],
+                        messages=[
+                            {"role": m["role"], "content": m["content"]}
+                            for m in st.session_state.messages
+                        ],
+                        temperature=0.3,
+                        stream=True,
+                    )
+                    st.session_state.sim_response = st.write_stream(parse_groq_stream(stream))
+                    
+                elif st.session_state.model == "gpt-4o":
+                    api_key = st.secrets["OPENAI_API_KEY"]
+                    client = OpenAI(
+                            base_url="https://api.openai.com/v1",
+                            api_key=api_key,
+                    )
+                    completion = client.chat.completions.create(
+                        model = st.session_state.model,
+                        messages = [
+                            {"role": m["role"], "content": m["content"]}
+                            for m in st.session_state.messages
+                        ],
+                        # headers={ "HTTP-Referer": "https://fsm-gpt-med-ed.streamlit.app", # To identify your app
+                        #     "X-Title": "GPT and Med Ed"},
+                        temperature = 0.5,
+                        max_tokens = 1000,
+                        stream = True,   
+                        )     
+                
+                    # placeholder = st.empty()
+                    st.session_state.sim_response = st.write_stream(completion)
+                    
+                    
                 
             st.session_state.messages.append({"role": "assistant", "content": st.session_state.sim_response})
     else:
@@ -314,17 +339,41 @@ if check_password():
             if st.session_state["last_audio_size"] != file_stats.st_size:    
                 # Display assistant response in chat message container
                 with st.chat_message("assistant", avatar="🤒"):
-                    with st.spinner("Answering... Please wait."):        
-                        stream = groq_client.chat.completions.create(
-                            model=st.session_state["model"],
-                            messages=[
-                                {"role": m["role"], "content": m["content"]}
-                                for m in st.session_state.messages
-                            ],
-                            temperature=0.3,
-                            stream=True,
-                        )
-                    st.session_state.sim_response = st.write_stream(parse_groq_stream(stream))
+                    with st.spinner("Answering... Please wait."):     
+                        if st.session_state.model == "llama3-70b-8192":   
+                            stream = groq_client.chat.completions.create(
+                                model=st.session_state["model"],
+                                messages=[
+                                    {"role": m["role"], "content": m["content"]}
+                                    for m in st.session_state.messages
+                                ],
+                                temperature=0.3,
+                                stream=True,
+                            )
+                            st.session_state.sim_response = st.write_stream(parse_groq_stream(stream))
+                        elif st.session_state.model == "gpt-4o":
+                            api_key = st.secrets["OPENAI_API_KEY"]
+                            client = OpenAI(
+                                    base_url="https://api.openai.com/v1",
+                                    api_key=api_key,
+                            )
+                            completion = client.chat.completions.create(
+                                model = st.session_state.model,
+                                messages = [
+                                    {"role": m["role"], "content": m["content"]}
+                                    for m in st.session_state.messages
+                                ],
+                                # headers={ "HTTP-Referer": "https://fsm-gpt-med-ed.streamlit.app", # To identify your app
+                                #     "X-Title": "GPT and Med Ed"},
+                                temperature = 0.5,
+                                max_tokens = 1000,
+                                stream = True,   
+                                )     
+                        
+                            # placeholder = st.empty()
+                            st.session_state.sim_response = st.write_stream(completion)
+                        
+                        
                     
                 st.session_state.messages.append({"role": "assistant", "content": st.session_state.sim_response})
                 st.session_state["last_audio_size"] = file_stats.st_size

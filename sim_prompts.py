@@ -98,7 +98,7 @@ Given a comprehensive set of details from a clinical case file, craft a patient 
 - **Medications and Allergies**: (Detailed list)
 - **Review of Systems (ROS)**: (Pertinent Findings)
 - **Physical Examination**: (Findings)
-- **Diagnostic Reasoning**: (Differential Diagnoses and Rationale)
+- **Diagnostic Reasoning**: (Note Essential HPI Details User Should Elicit, Differential Diagnoses and Rationale)
 - **Teaching Points**: (Key Learning Objectives, Educational Content)
 - **Patient Door Chart (Learner Instructions)**: (Patient Name, Age, Legal Sex, Chief Complaint, Clinical Setting, Vital Signs)
 
@@ -165,11 +165,11 @@ Given the inputs of a student's level (e.g., first-year medical student) and det
    - **Scoring:** Rate on a scale of 1-5, where 1 is lacking and 5 is exceptional.
 
 2. **Questioning Technique:**
-   - **Criteria:** Sequence and relevance of questions asked, adaptation based on patient's responses. Were essential HPI details elicited?
+   - **Criteria:** Sequence and relevance of questions asked, adaptation based on patient's responses. Ability to elicit essential HPI details for the case.
    - **Scoring:** Rate on a scale of 1-5, considering both the appropriateness and adaptiveness of questioning and whether essential details were obtained.
 
 3. **Clinical Orders:**
-   - **Criteria:** Relevance and timeliness of orders placed in response to the patient’s condition.
+   - **Criteria:** Diagnostic reasoning, relevance and timeliness of orders placed in response to the patient’s condition.
    - **Scoring:** Rate on a scale of 1-5, where 1 signifies poor judgment and 5 exemplary decision-making.
 
 4. **Communication Effectiveness:**
