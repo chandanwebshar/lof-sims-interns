@@ -155,6 +155,9 @@ if check_password():
     if "expanded" not in st.session_state:
         st.session_state["expanded"] = True
         
+    if "edited_new_case" not in st.session_state:
+        st.session_state["edited_new_case"] = ""
+        
     tab1, tab2 = st.tabs(["New Case", "Retrieve a Case"])
     
     with tab1:
@@ -227,9 +230,14 @@ if check_password():
                 if st.checkbox("Edit Case (Scroll Down)", value=False):
                     with col3:
                         st.session_state.expanded = False
-                        st.warning("Please edit the case as needed while leaving other characters, e.g., '#' and '*', in place. Enter control-enter or command-enter to save edits!")
+                        st.warning("Please edit the case as needed while leaving other characters, e.g., '#' and '*', in place. Use the 'Save Case Edits' button at the bottom to save edits!")
                         
-                        st.session_state["final_case"] = st.text_area("Edit Case, enter control-enter or command-enter to save edits!", st.session_state.response_markdown, height=1000) 
+                        edited_new_case = st.text_area("Click button at bottom to save your edits!", st.session_state.response_markdown, height=1000) 
+                        if st.button("Save Case Edits for the Simulator"):
+                            st.success("Case Edits Saved!")
+                            if edited_new_case:
+                                st.session_state["final_case"] = edited_new_case
+                        st.page_link("pages/🧠_Sim_Chat.py", label="Click Here to Wake the Simulator (including any saved edits)", icon="🧠")
                 else:
                     st.session_state["final_case"] = st.session_state.response_markdown
 
@@ -242,7 +250,9 @@ if check_password():
         with col3:
             roles = ["1st year medical student", "2nd year medical student", "3rd year medical student", "4th year medical student", "Resident", "Fellow", "Attending"]
             if st.session_state.final_case:
-                case_details = st.text_area("Case Details", value=st.session_state.final_case)
+                st.divider()
+                st.header("Save Case to the Database for Future Use, too!")
+                case_details = st.text_area("Case Details to Save to the Database for Future Use", value=st.session_state.final_case)
                 saved_name = st.text_input("Saved Name (Required to save case)")
                 # selected_role = st.selectbox("Role", roles)
                 # specialty = ""
