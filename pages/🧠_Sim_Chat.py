@@ -12,7 +12,7 @@ import requests
 import json
 import base64
 import random
-from sims import llm_call
+from sims import llm_call, generate_pdf
 
 st.set_page_config(page_title='Simulated Chat', layout = 'centered', page_icon = ':stethoscope:', initial_sidebar_state = 'expanded')
 

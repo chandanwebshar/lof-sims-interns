@@ -67,6 +67,16 @@ def save_transcript(transcript_content, role, specialty):
     new_transcript = Transcript(content=transcript_content, role=role, specialty=specialty)
     session.add(new_transcript)
     session.commit()
+    
+def generate_pdf(text):
+    """Generate an example pdf file and save it to example.pdf"""
+    from fpdf import FPDF
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="Welcome to Streamlit!", ln=1, align="C")
+    pdf.output("example.pdf")
 
 # Function to save an assessment
 def save_assessment(assessment_content, role, specialty):
