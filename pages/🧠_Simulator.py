@@ -14,7 +14,7 @@ import requests
 import json
 import base64
 import random
-from sims import llm_call, PDF 
+from Start import llm_call, PDF 
 
 # st.set_page_config(page_title='Simulated Chat', layout = 'centered', page_icon = ':stethoscope:', initial_sidebar_state = 'expanded')
 
@@ -123,39 +123,7 @@ def autoplay_local_audio(filepath: str):
         unsafe_allow_html=True,
     )
 
-def check_password():
-    """Returns `True` if the user had the correct password."""
 
-    def password_entered():
-        """Checks whether a password entered by the user is correct."""
-        if st.session_state["password"] == st.secrets["password"]:
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # don't store password
-        else:
-            st.session_state["password_correct"] = False
-
-    if "password_correct" not in st.session_state:
-        # First run, show input for password.
-        st.text_input(
-            "Password", type="password", on_change=password_entered, key="password"
-        )
-        st.write("*Please contact David Liebovitz, MD if you need an updated password for access.*")
-        return False
-    elif not st.session_state["password_correct"]:
-        # Password not correct, show input + error.
-        st.text_input(
-            "Password", type="password", on_change=password_entered, key="password"
-        )
-        st.error("😕 Password incorrect")
-        return False
-    else:
-        # Password correct.
-        return True
-def parse_groq_stream(stream):
-    for chunk in stream:
-        if chunk.choices:
-            if chunk.choices[0].delta.content is not None:
-                yield chunk.choices[0].delta.content
 
 @st.cache_data
 def extract_patient_door_chart_section(text):
@@ -179,7 +147,7 @@ def extract_patient_door_chart_section(text):
         return text[start_index:]
     else:
         # Return a message indicating the section was not found if it doesn't exist in the string
-        return "PATIENT DOOR CHART section not found in the provided text."
+        return "PATIENT DOOR CHART section not found in the provided text. Please go back to the Start page!"
 # st.write(f'Here is the case {st.session_state.final_case}')
 
 try:
@@ -211,8 +179,11 @@ groq_client = Groq(api_key = st.secrets['GROQ_API_KEY'])
 st.title("Clinical Simulator Chat")
 # st.caption('Powered by [Groq](https://groq.com/).')
 
+if "password_correct" not in st.session_state:
+    st.session_state["password_correct"] = False
+    st.write("Login on the Sims page to get started.")
 
-if check_password():
+if st.session_state["password_correct"] == True:
     st.info("Type your questions at the bottom of the page or use voice input! You may need to right click your Chrome browser tab to unmute this website and also accept the microphone permissions.")
 
     

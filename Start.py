@@ -215,7 +215,7 @@ def check_password():
         # Password correct.
         return True
 
-st.title("Case Study Framework Generator")
+st.title("Case Generator for Simulations")
 init_session()
 
 if check_password():
