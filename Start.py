@@ -309,7 +309,7 @@ if check_password():
                             if edited_new_case:
                                 st.session_state["final_case"] = edited_new_case
                         # st.session_state.sidebar_state = 'expanded'
-                        st.page_link("pages/🧠_Sim_Chat.py", label="Wake the Simulator (including any saved edits)", icon="🧠")
+                        st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator (including any saved edits)", icon="🧠")
                 else:
                     st.session_state["final_case"] = st.session_state.response_markdown
                 
@@ -328,7 +328,7 @@ if check_password():
                         st.session_state["final_case"] = st.session_state.final_case  # Ensure the case is correctly set
                         st.session_state["retrieved_name"] = st.session_state.retrieved_name
                         # st.session_state.sidebar_state = 'expanded'
-                        st.page_link("pages/🧠_Sim_Chat.py", label="Wake the Simulator", icon="🧠")
+                        st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator", icon="🧠")
 
         with col3:
             roles = ["1st year medical student", "2nd year medical student", "3rd year medical student", "4th year medical student", "Resident", "Fellow", "Attending"]
@@ -405,7 +405,7 @@ if check_password():
                                 else:
                                     st.error("Saved Name is required to save the case")
                     # st.session_state.sidebar_state = 'expanded'        
-                    st.page_link("pages/🧠_Sim_Chat.py", label="Wake the Simulator ", icon="🧠")
+                    st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator ", icon="🧠")
             
             
 

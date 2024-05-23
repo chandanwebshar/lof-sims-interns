@@ -190,7 +190,7 @@ if st.session_state["password_correct"] == True:
     st.sidebar.title('Customization')
     st.session_state.model = st.sidebar.selectbox(
             'Choose a model',
-            ['llama3-70b-8192', 'gpt-4o']
+            ['llama3-70b-8192', 'gpt-4o',], index=1,
         )
         # Initialize chat history
 
