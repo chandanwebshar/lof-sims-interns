@@ -37,7 +37,7 @@ def assign_random_voice(sex):
     else:
         voices = female_voices
     
-    # Randomly choose one voice from the list
+    # Randomly voice one voice from the list
     voice = random.choice(voices)
     
     return voice
@@ -184,14 +184,16 @@ if "password_correct" not in st.session_state:
     st.write("Login on the Sims page to get started.")
 
 if st.session_state["password_correct"] == True:
-    st.info("Type your questions at the bottom of the page or use voice input! You may need to right click your Chrome browser tab to unmute this website and also accept the microphone permissions.")
+    st.info("Type your questions at the bottom of the page or use voice input (left sidebar)! You may need to right click your Chrome browser tab to unmute this website and also accept the microphone permissions.")
 
     
-    st.sidebar.title('Customization')
-    st.session_state.model = st.sidebar.selectbox(
-            'Choose a model',
-            ['llama3-70b-8192', 'gpt-4o',], index=1,
-        )
+    # st.sidebar.title('Customization')
+    with st.sidebar:
+        with st.expander("Change Model", expanded=False):
+            st.session_state.model = st.selectbox(
+                    'voice a model',
+                    ['llama3-70b-8192', 'gpt-4o',], index=1,
+                )
         # Initialize chat history
 
         
@@ -233,8 +235,8 @@ if st.session_state["password_correct"] == True:
 
             # Audio selection
     
-    input_source = st.radio("Choose to type or speak!", ("Text", "Microphone"), index=0)
-    st.session_state.audio_off = st.checkbox("Turn off voice generation", value=False) 
+    input_source = st.sidebar.radio("Choose to type or speak!", ("Text", "Microphone"), index=0)
+    st.session_state.audio_off = st.sidebar.checkbox("Turn off voice response", value=False) 
     # Display chat messages from history on app rerun
     conversation_str = extracted_section + "\n\n" + "______" + "\n\n" + "**Clinical Interview:**\n\n"
     for message in st.session_state.messages:
@@ -411,6 +413,9 @@ if st.session_state["password_correct"] == True:
     #     html = markdown2.markdown(conversation_str, extras=["tables"])
     #     st.download_button('Download the conversation when done!', html, f'sim_response.html', 'text/html')
     #     st.session_state.sim_response = ""
+    
+    st.sidebar.divider()
+    st.sidebar.subheader("Chart Access")
     
     orders = st.sidebar.checkbox("Write Orders", value=False)
     if orders:
