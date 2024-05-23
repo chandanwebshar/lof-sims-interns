@@ -420,7 +420,7 @@ if st.session_state["password_correct"] == True:
     orders = st.sidebar.checkbox("Write Orders", value=False)
     if orders:
         with st.sidebar:
-            order_details = st.text_input("Orders", key="order")
+            order_details = st.text_input("Orders (lung exam, x-ray, labs, consult, etc.)", key="order")
 
             if st.button("Submit Orders"):
                 st.session_state.orders_placed = order_details + "\n\n" + st.session_state.orders_placed
