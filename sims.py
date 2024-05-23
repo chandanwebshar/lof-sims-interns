@@ -3,10 +3,12 @@ import markdown2
 import json
 import requests
 from sim_prompts import *  # Ensure this import provides the needed functionality
-
+from bs4 import BeautifulSoup
+from fpdf import FPDF
 from sqlalchemy import create_engine, Column, Integer, String, Text, MetaData, Index
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+# from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base
+# from st_pages import show_pages, hide_pages, Page
 
 # Database setup
 DATABASE_URL = "sqlite:///app_data.db"  # SQLite database
@@ -14,6 +16,7 @@ DATABASE_URL = "sqlite:///app_data.db"  # SQLite database
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 session = Session()
+# Base = declarative_base()
 Base = declarative_base()
 
 # Define the models
@@ -49,8 +52,78 @@ st.set_page_config(
     page_title='Simulated Case Generator',
     page_icon='🌌',
     layout="wide",
-    initial_sidebar_state='collapsed'
+    initial_sidebar_state='auto'
 )
+
+class PDF(FPDF):
+    def header(self):
+        self.set_font("Arial", "B", 12)
+        self.cell(0, 10, self.title, 0, 1, "C")
+        self.ln(10)
+
+    def chapter_title(self, title, level=1):
+        if level == 1:
+            self.set_font("Arial", "B", 16)
+            self.ln(10)
+        elif level == 2:
+            self.set_font("Arial", "B", 14)
+            self.ln(8)
+        elif level == 3:
+            self.set_font("Arial", "B", 12)
+            self.ln(6)
+        self.cell(0, 10, title, 0, 1, "L")
+        self.ln(2)
+
+    def chapter_body(self, body):
+        self.set_font("Arial", "", 12)
+        self.multi_cell(0, 10, body)
+        self.ln()
+
+    def add_list(self, items, is_ordered=False):
+        self.set_font("Arial", "", 12)
+        for i, item in enumerate(items, start=1):
+            if is_ordered:
+                self.multi_cell(0, 10, f"{i}. {item}")
+            else:
+                self.multi_cell(0, 10, f"- {item}")
+        self.ln()
+
+def html_to_pdf(html_content, name):
+    # Use BeautifulSoup to parse the HTML
+    soup = BeautifulSoup(html_content, "html.parser")
+    
+    # Extract title for the document
+    case_title_tag = soup.find("h1")
+    case_title = case_title_tag.get_text() if case_title_tag else "Document"
+    
+    # Create PDF instance with dynamic title
+    pdf = PDF()
+    pdf.title = case_title
+    pdf.add_page()
+
+    # Process each section of the HTML
+    for element in soup.find_all(["h1", "h2", "h3", "p", "ul", "ol", "li", "hr"]):
+        if element.name == "h1":
+            pdf.chapter_title(element.get_text(), level=1)
+        elif element.name == "h2":
+            if "Patient Door Chart" in element.get_text():
+                pdf.add_page()
+            pdf.chapter_title(element.get_text(), level=2)
+        elif element.name == "h3":
+            pdf.chapter_title(element.get_text(), level=3)
+        elif element.name == "p":
+            pdf.chapter_body(element.get_text())
+        elif element.name == "ul":
+            items = [li.get_text() for li in element.find_all("li")]
+            pdf.add_list(items, is_ordered=False)
+        elif element.name == "ol":
+            items = [li.get_text() for li in element.find_all("li")]
+            pdf.add_list(items, is_ordered=True)
+        elif element.name == "hr":
+            pdf.add_page()
+    
+    # Output the PDF
+    pdf.output(name)
 
 def init_session():
     if "final_case" not in st.session_state:
@@ -158,6 +231,16 @@ init_session()
 
 if check_password():
     st.info("**Provide inputs and generate a case! Open the left sidebar to change models; default is inexpensive Haiku.**")
+    
+    with st.expander("Model Options for Case Generation (Claude3 Haiku by default)", expanded=False):
+        model_choice = st.selectbox("Model Options", (
+            "anthropic/claude-3-haiku",
+            "anthropic/claude-3-sonnet", 
+            "anthropic/claude-3-opus", 
+            "openai/gpt-4-turbo", 
+            "google/gemini-pro", 
+            "meta-llama/llama-2-70b-chat",
+        ), index=0)
 
     if "response_markdown" not in st.session_state:
         st.session_state["response_markdown"] = ""
@@ -172,20 +255,11 @@ if check_password():
     
     with tab1:
 
-        col1, col2, col3 = st.columns([1, 0.5, 4])
+        col1, col2, col3 = st.columns([1, 1, 4])
 
         with col1:    
             st.info("**Include desired history in the text paragraph. The AI will generate additional details as needed to draft an educational case.**")
                 
-            with st.sidebar:
-                model_choice = st.selectbox("Model Options", (
-                    "anthropic/claude-3-haiku",
-                    "anthropic/claude-3-sonnet", 
-                    "anthropic/claude-3-opus", 
-                    "openai/gpt-4-turbo", 
-                    "google/gemini-pro", 
-                    "meta-llama/llama-2-70b-chat",
-                ), index=0)
                 
             learning_objectives = st.multiselect(
                 "Select one or more learning objectives; default is a focused history/examination",
@@ -233,9 +307,7 @@ if check_password():
                     st.session_state.expanded = False
             
             with col2:
-                st.info("Download or edit the case and begin the simulator!")
-                html = markdown2.markdown(st.session_state.response_markdown, extras=["tables"])
-                st.download_button('Download the Case', html, f'case.html', 'text/html')
+                st.info("Review and/or edit the case and begin the simulator!")                  
             
                 if st.checkbox("Edit Case (Scroll Down)", value=False):
                     with col3:
@@ -247,35 +319,50 @@ if check_password():
                             st.success("Case Edits Saved!")
                             if edited_new_case:
                                 st.session_state["final_case"] = edited_new_case
-                        st.page_link("pages/🧠_Sim_Chat.py", label="Click Here to Wake the Simulator (including any saved edits)", icon="🧠")
+                        # st.session_state.sidebar_state = 'expanded'
+                        st.page_link("pages/🧠_Sim_Chat.py", label="Wake the Simulator (including any saved edits)", icon="🧠")
                 else:
                     st.session_state["final_case"] = st.session_state.response_markdown
+                
+                if st.session_state.final_case !="":        
+                    case_html = markdown2.markdown(st.session_state.final_case, extras=["tables"])
+                        # st.download_button('Download HTML Case file', html, f'case.html', 'text/html')
+                        
+                    # st.info("Download the Current Case:")
+                    if st.checkbox("Generate Case PDF file"):
+                        html_to_pdf(case_html, 'case.pdf')
+                        with open("case.pdf", "rb") as f:
+                            st.download_button("Download Case PDF", f, "case.pdf")
 
                 if st.session_state["final_case"] != "":
                     if st.button("Send case to the simulator!"):
                         st.session_state["final_case"] = st.session_state.final_case  # Ensure the case is correctly set
                         st.session_state["retrieved_name"] = st.session_state.retrieved_name
-                        st.page_link("pages/🧠_Sim_Chat.py", label="Click Here to Wake the Simulator", icon="🧠")
+                        # st.session_state.sidebar_state = 'expanded'
+                        st.page_link("pages/🧠_Sim_Chat.py", label="Wake the Simulator", icon="🧠")
 
         with col3:
             roles = ["1st year medical student", "2nd year medical student", "3rd year medical student", "4th year medical student", "Resident", "Fellow", "Attending"]
             if st.session_state.final_case:
                 st.divider()
-                st.header("Save Case to the Database for Future Use, too!")
-                case_details = st.text_area("Case Details to Save to the Database for Future Use", value=st.session_state.final_case)
-                saved_name = st.text_input("Saved Name (Required to save case)")
-                # selected_role = st.selectbox("Role", roles)
-                # specialty = ""
-                # if selected_role in ["Resident", "Fellow", "Attending"]:
-                #     specialty = st.text_input("Specialty", "")
+                if st.checkbox("Save Case to the Database for Future Use"):
+                    case_details = st.text_area("Case Details to Save to the Database for Future Use", value=st.session_state.final_case)
+                    saved_name = st.text_input("Saved Name (Required to save case)")
+                    # selected_role = st.selectbox("Role", roles)
+                    # specialty = ""
+                    # if selected_role in ["Resident", "Fellow", "Attending"]:
+                    #     specialty = st.text_input("Specialty", "")
 
-                if st.button("Save Case to the Database for future use!"):
-                    if saved_name:
-                        save_case_details(case_details, saved_name)
-                        st.success("Case Details saved successfully!")
-                    else:
-                        st.error("Saved Name is required to save the case")
+                    if st.button("Save Case to the Database for future use!"):
+                        if saved_name:
+                            save_case_details(case_details, saved_name)
+                            st.success("Case Details saved successfully!")
+                        else:
+                            st.error("Saved Name is required to save the case")
 
+
+    
+    
     # Initialize session state variables
     # Initialize session state variables
     if "search_results" not in st.session_state:
@@ -285,54 +372,53 @@ if check_password():
 
     # Tab2 content for retrieving and selecting cases
     with tab2:
-        st.header("Retrieve Records")
-        search_text = st.text_input("Search Text")
-        search_saved_name = st.text_input("Search by Saved Name")
-        search_role = st.selectbox("Search by Role", [""] + roles)
-        search_specialty = ""
-        if search_role in ["Resident", "Fellow", "Attending"]:
-            search_specialty = st.text_input("Search by Specialty", "")
+        
+        col3, col4 = st.columns([1,3])
+        with col3:
+            st.header("Retrieve Records")
+            search_text = st.text_input("Search Text")
+            search_saved_name = st.text_input("Search by Saved Name")
+            search_role = st.selectbox("Search by Role", [""] + roles)
+            search_specialty = ""
+            if search_role in ["Resident", "Fellow", "Attending"]:
+                search_specialty = st.text_input("Search by Specialty", "")
 
-        if st.button("Search Cases"):
-            st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name, search_role, search_specialty)
+            if st.button("Search Cases"):
+                st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name, search_role, search_specialty)
 
-        if st.session_state.search_results:
-            st.subheader("Cases Found")
-            for i, case in enumerate(st.session_state.search_results):
-                st.write(f"Saved Name: {case.saved_name}, Role: {case.role}, Specialty: {case.specialty}")
-                if st.button(f"View (and Select) Case {i+1}", key=f"select_case_{i}"):
-                    st.session_state.selected_case = case
+            if st.session_state.search_results:
+                st.subheader("Cases Found")
+                for i, case in enumerate(st.session_state.search_results):
+                    st.write(f"Saved Name: {case.saved_name}, Role: {case.role}, Specialty: {case.specialty}")
+                    if st.button(f"View (and Select) Case {i+1}", key=f"select_case_{i}"):
+                        st.session_state.selected_case = case
+            with col4:
+                if st.session_state.selected_case:
+                    st.subheader("Retrieved Case")
+                    with st.expander("View Full Case", expanded=False):
+                        st.write(f'Here is the retrieved case name: {st.session_state.selected_case.saved_name}')
+                        st.write(st.session_state.selected_case.content)
+                        st.session_state.final_case = st.session_state.selected_case.content
+                    if st.checkbox("Edit Retrieved Case (Scroll Down)", value=False, key = "initial_case_edit"):
+                        st.session_state.expanded = False
+                        st.warning('Please edit the case as needed while leaving other characters, e.g., "#" and "*", in place. Remember to update the Door Chart section at the bottom!')
+                        updated_retrieved_case = st.text_area("Edit Case, enter control-enter or command-enter to save edits!", st.session_state.selected_case.content, height=1000)
+                        make_new_entry = st.checkbox("If desired, make a database entry when saving edits.", value=False)
+                        if make_new_entry:
+                            saved_name = st.text_input("Saved Name after edits (Required to save case)")
+                        if st.button("Save Edits"):
+                            st.session_state.final_case = updated_retrieved_case
+                            st.info("Case Edits Saved!")            
+                            if make_new_entry:
+                                if saved_name:
+                                    save_case_details(st.session_state.final_case, saved_name)
+                                    st.success("Case Details saved successfully!")
+                                else:
+                                    st.error("Saved Name is required to save the case")
+                    # st.session_state.sidebar_state = 'expanded'        
+                    st.page_link("pages/🧠_Sim_Chat.py", label="Wake the Simulator ", icon="🧠")
+            
+            
 
-        if st.session_state.selected_case:
-            st.subheader("Retrieved Case")
-            with st.expander("View Full Case", expanded=False):
-                st.write(f'Here is the retrieved case name: {st.session_state.selected_case.saved_name}')
-                st.write(st.session_state.selected_case.content)
-                st.session_state.final_case = st.session_state.selected_case.content
-            if st.checkbox("Edit Case (Scroll Down)", value=False, key = "initial_case_edit"):
-                st.session_state.expanded = False
-                st.warning('Please edit the case as needed while leaving other characters, e.g., "#" and "*", in place. Remember to update the Door Chart section at the bottom!')
-                updated_retrieved_case = st.text_area("Edit Case, enter control-enter or command-enter to save edits!", st.session_state.selected_case.content, height=1000)
-                make_new_entry = st.checkbox("Make a new entry with the edited case", value=False)
-                if make_new_entry:
-                    saved_name = st.text_input("Saved Name after edits (Required to save case)")
-                if st.button("Save Edits"):
-                    st.session_state.final_case = updated_retrieved_case
-                    st.info("Case Edits Saved!")
-                    if make_new_entry:
-                        # case_details = updated_retrieved_case
-                        # saved_name = st.text_input("Saved Name after edits (Required to save case)")
-                        # selected_role = st.selectbox("Role", roles)
-                        # specialty = ""
-                        # if selected_role in ["Resident", "Fellow", "Attending"]:
-                        #     specialty = st.text_input("Specialty", "")
 
-
-                        if saved_name:
-                            save_case_details(updated_retrieved_case, saved_name)
-                            st.success("Case Details saved successfully!")
-                        else:
-                            st.error("Saved Name is required to save the case")
-                    
-            st.page_link("pages/🧠_Sim_Chat.py", label="Click Here to Wake the Simulator", icon="🧠")
 
