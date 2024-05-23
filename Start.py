@@ -363,18 +363,20 @@ if check_password():
             st.header("Retrieve Records")
             search_text = st.text_input("Search Text")
             search_saved_name = st.text_input("Search by Saved Name")
-            search_role = st.selectbox("Search by Role", [""] + roles)
+            # search_role = st.selectbox("Search by Role", [""] + roles)
+            search_role =""
             search_specialty = ""
             if search_role in ["Resident", "Fellow", "Attending"]:
                 search_specialty = st.text_input("Search by Specialty", "")
 
             if st.button("Search Cases"):
-                st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name, search_role, search_specialty)
+                st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name)
 
             if st.session_state.search_results:
                 st.subheader("Cases Found")
                 for i, case in enumerate(st.session_state.search_results):
-                    st.write(f"Saved Name: {case.saved_name}, Role: {case.role}, Specialty: {case.specialty}")
+                    # st.write(f"Saved Name: {case.saved_name}, Role: {case.role}, Specialty: {case.specialty}")
+                    st.write(f"{i+1}. {case.saved_name}")
                     if st.button(f"View (and Select) Case {i+1}", key=f"select_case_{i}"):
                         st.session_state.selected_case = case
             with col4:
@@ -391,9 +393,13 @@ if check_password():
                         make_new_entry = st.checkbox("If desired, make a database entry when saving edits.", value=False)
                         if make_new_entry:
                             saved_name = st.text_input("Saved Name after edits (Required to save case)")
-                        if st.button("Save Edits"):
+                        if st.button("Save Edits for Simulation and Generate a PDF"):
                             st.session_state.final_case = updated_retrieved_case
-                            st.info("Case Edits Saved!")            
+                            st.info("Case Edits Saved!")   
+                            updated_case_html = markdown2.markdown(st.session_state.final_case, extras=["tables"])
+                            html_to_pdf(updated_case_html, 'updated_case.pdf')
+                            with open("updated_case.pdf", "rb") as f:
+                                st.download_button("Download Updated Case PDF", f, "updated_case.pdf")
                             if make_new_entry:
                                 if saved_name:
                                     save_case_details(st.session_state.final_case, saved_name)
