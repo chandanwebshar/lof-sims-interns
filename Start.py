@@ -219,7 +219,7 @@ st.title("Case Generator for Simulations")
 init_session()
 
 if check_password():
-    st.info("**Provide inputs and generate a case! Open the left sidebar to change models; default is inexpensive Haiku.**")
+    st.info("Provide inputs and generate a case. After your case is generated, please click the '*Send case to the simulator!*' and then wake the simulator.")
     
     with st.expander("Model Options for Case Generation (Claude3 Haiku by default)", expanded=False):
         model_choice = st.selectbox("Model Options", (
