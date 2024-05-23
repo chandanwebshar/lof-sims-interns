@@ -226,7 +226,7 @@ if check_password():
             "anthropic/claude-3-haiku",
             "anthropic/claude-3-sonnet", 
             "anthropic/claude-3-opus", 
-            "openai/gpt-4-turbo", 
+            "openai/gpt-4o", 
             "google/gemini-pro", 
             "meta-llama/llama-2-70b-chat",
         ), index=0)
@@ -250,23 +250,23 @@ if check_password():
             st.info("**Include desired history in the text paragraph. The AI will generate additional details as needed to draft an educational case.**")
                 
                 
-            learning_objectives = st.multiselect(
-                "Select one or more learning objectives; default is a focused history/examination",
-                [
-                    "Perform a focused history and examination",
-                    "Provide patient education",
-                    "Demonstrate effective interpersonal skills",
-                    "Determine a Dx and DDx",
-                    "Determine a plan for management",
-                    "Document the patient case"
-                ], default="Perform a focused history and examination",
-                help="Choose the learning objectives relevant to this case study."
-            )
+            # learning_objectives = st.multiselect(
+            #     "Select one or more learning objectives; default is a focused history/examination",
+            #     [
+            #         "Perform a focused history and examination",
+            #         "Provide patient education",
+            #         "Demonstrate effective interpersonal skills",
+            #         "Determine a Dx and DDx",
+            #         "Determine a plan for management",
+            #         "Document the patient case"
+            #     ], default="Perform a focused history and examination",
+            #     help="Choose the learning objectives relevant to this case study."
+            # )
 
             case_study_input = {
-                'Case Title': st.text_input("Case Study Title"),
-                'Case Description': st.text_area("Case Study Description, as detailed or brief as desired, e.g., 65F with acute chest pain...", height=200),
-                'Case Primary Diagnosis': st.text_input("Case Primary Diagnosis, e.g., Pulmonary Embolism"),
+                'Case Title': st.text_input("Case Study Title", help="Presenting symptom, e.g."),
+                'Case Description': st.text_area("Case Description", height=200, help = "As detailed or brief as desired, e.g., 65F with acute chest pain..."),
+                'Case Primary Diagnosis': st.text_input("Primary Diagnosis", help = "The one or more primary diagnoses, e.g., Pulmonary Embolism"),
             }
             case_study_input = json.dumps(case_study_input)
         
@@ -276,12 +276,8 @@ if check_password():
 
         if submit_button:
             messages = [
-                {"role": "system", "content": f'Use input provided with additional AI generated content to fully flesh out a clinical case optimized for simulation using the following format: {output_format}'},
-                {"role": "user", "content": f"""
-                    "case_details": {case_study_input},
-                    "learning_objectives": {learning_objectives},
-                    """
-                }
+                {"role": "system", "content": f'Using the case details provided (supplemented as needed with additional generated content), comprehensively populate an educational clinical case description in the following specific format: {output_format}'},
+                {"role": "user", "content": f'case_details: {case_study_input}'}
             ]
         
             with col2:

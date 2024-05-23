@@ -81,10 +81,43 @@ output_format = """
 - **SpO2**: `{{spo2}}`
 """
 
-sim_persona = """
+sim_persona = """### Create a Patient Persona for Case Study Simulation
+
+Given a comprehensive set of details from a clinical case file, craft a patient persona who aligns with the provided information in an empathetic, realistic, and nuanced manner. 
+This persona should be able to respond to simulated interactions based on the specifics of their medical history, personal life, and more. 
+
+**Input Details:**
+
+- **Case Title**: (Input case title here)
+- **Paragraph Summary**: (Input summary)
+- **Patient Education Level, Emotional Response, Communication Style**: (Input details)
+- **History of Present Illness (HPI)**: (Onset, Location, Duration, Character, Aggravating/Alleviating Factors, etc.)
+- **Past Medical History (PMHx)**: (Active Problems, Surgical History, Immunizations, etc.)
+- **Social History (SHx)**: (Tobacco, Alcohol, Substances, Diet, Exercise, etc.)
+- **Family History (FHx)**: (Parents, Siblings health status)
+- **Medications and Allergies**: (Detailed list)
+- **Review of Systems (ROS)**: (Pertinent Findings)
+- **Physical Examination**: (Findings)
+- **Diagnostic Reasoning**: (Note Essential HPI Details User Should Elicit, Differential Diagnoses and Rationale)
+- **Teaching Points**: (Key Learning Objectives, Educational Content)
+- **Patient Door Chart (Learner Instructions)**: (Patient Name, Age, Legal Sex, Chief Complaint, Clinical Setting, Vital Signs)
+
+**Prompt:**
+
+Considering the in-depth information provided, create a fictional patient persona named **(Input patient's name here)**. This persona should be a vivid representation of the patient described in the case study, ready to interact with healthcare professionals in a simulated environment. The persona must reflect the specifics of their medical and social history, personal attributes, and any other pivotal information listed above. 
+
+For any potential gaps not covered in the provided details, include questions that would naturally arise based on the existing information, designed to deepen understanding and empathy towards the patient's situation.
+
+**Remember:** The goal is to foster a comprehensive understanding of the patient's life and health situation, aiding in better clinical decision-making and compassionate care.
+**Final note:** Express emotion with pauses or expression of discomfort, e.g., Do not include stage instuctions, "with sadness".
+```"""
+
+sim_persona_old = """
 ### Create a Patient Persona for Case Study Simulation
 
-Given a comprehensive set of details from a clinical case file, craft a patient persona who aligns with the provided information in an empathetic, realistic, and nuanced manner. This persona should be able to respond to simulated interactions based on the specifics of their medical history, personal life, and more. If any clarifications or additional details are needed that weren't included in the original case file, generate questions that seamlessly integrate with the existing case information.
+Given a comprehensive set of details from a clinical case file, craft a patient persona who aligns with the provided information in an empathetic, realistic, and nuanced manner. 
+This persona should be able to respond to simulated interactions based on the specifics of their medical history, personal life, and more. If any clarifications or additional details are needed 
+that weren't included in the original case file, generate questions that seamlessly integrate with the existing case information.
 
 **Input Details:**
 
@@ -144,11 +177,11 @@ Sample Generated Output:
 D-DIMER: 140.00, REF: D-DIMER: < 240.00 ng/mL DDU
 """
 
-assessment_prompt = """**Title:** Grading and Assessment of Simulated Patient Interaction by Medical Student Level
+assessment_prompt = """**Title:** Grading and Assessment of Interaction with a Simulated Patient
 
 *Instructions:*
 
-Given the inputs of a student's level (e.g., first-year medical student) and detailed case information about a simulated patient, please analyze a transcript of the student's interaction with the patient, including the decisions regarding specific orders that were placed. Utilize the following rubric to grade and assess the interaction:
+Given the following inputs, assess the quality of the student's interactions with the simulated patient:
 
 **Input Details:**
 
@@ -165,8 +198,8 @@ Given the inputs of a student's level (e.g., first-year medical student) and det
    - **Scoring:** Rate on a scale of 1-5, where 1 is lacking and 5 is exceptional.
 
 2. **Questioning Technique:**
-   - **Criteria:** Sequence and relevance of questions asked, adaptation based on patient's responses. Ability to elicit essential HPI details for the case.
-   - **Scoring:** Rate on a scale of 1-5, considering both the appropriateness and adaptiveness of questioning and whether essential details were obtained.
+   - **Criteria:** Sequence and relevance of questions asked, adaptation based on patient's responses. Ability to elicit all essential HPI details for the case.
+   - **Scoring:** Rate on a scale of 1-5, considering both the appropriateness and adaptiveness of questioning and whether all essential details were obtained.
 
 3. **Clinical Orders:**
    - **Criteria:** Diagnostic reasoning, relevance and timeliness of orders placed in response to the patient’s condition.
@@ -182,7 +215,7 @@ Given the inputs of a student's level (e.g., first-year medical student) and det
 - Offer constructive feedback on areas for improvement.
 - Suggest specific actions or learning resources for enhancing skills in identified weak areas.
 
-**Please proceed to grade and assess the student's performance based on the provided rubric and transcript.**
+**Please proceed to grade and assess the student's performance based on the provided rubric and inputs.**
 """
 
 output_format_json = """{
