@@ -163,7 +163,8 @@ Given the specified orders, alongside the patient context, create a set of resul
 - Are tailored to the provided patient case, reflecting an understanding of their condition and history.
 - Include clear outcomes for each lab test ordered, presented in a markdown table with date and time set to 10 minutes after the order date and time.
 - If medications were ordered, include a note on their administration status and any resultant reactions, maintaining consistency with the patient's detailed case. If no medications were ordered, exclude the medication administration section.
-- Provide findings for other included actions in the orders (e.g., lung examination) with findings tied to the patient’s case.
+- When explicitly requested, provide findings for other actions in the orders (e.g., lung examination) with findings tied to the patient’s case.
+- Provide periodic vital sign updates.
 
 **Guidelines:**
 
