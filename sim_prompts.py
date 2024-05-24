@@ -148,7 +148,7 @@ For any potential gaps not covered in the provided details, include questions th
 orders_prompt = """### Generate Results for a Patient Simulation Case for New Orders
 
 **Task:** Leverage the new orders/actions provided, and the comprehensive patient case information, to generate accurate and consistent results for a simulated patient case. 
-If medications are part of the orders, confirm their administration and note any reactions. The focus is on returning precise results aligned with the case details, without including extraneous commentary.
+Do not comment on missing order categories, e.g., no new meds or labs. The focus is on returning precise results for *new* orders/actions that align with evolving case details, without including extraneous commentary.
 
 **Input Details:**
 
