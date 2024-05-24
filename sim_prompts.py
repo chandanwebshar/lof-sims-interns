@@ -171,7 +171,7 @@ Given the specified orders, alongside the patient context, create a set of resul
 
 - Ensure the results directly tie back to and are consistent with the patient scenario described.
 - Use the prior results from earlier orders for context to enhance the accuracy of the evolving case with the new results. 
-- Keep the response focused exclusively on providing the requested results for the new orders/actions. Avoid unrelated details or commentary.
+- Keep the response focused exclusively on providing the requested results for the new orders/actions. Avoid unrelated details or commentary, e.g., "no new medications" or "simulation".
 - Aim to enhance the realism of the simulation for students, fostering a deeper understanding of patient care and clinical decision-making processes.
 - Make your best match possible for any abbreviations used in Orders/Actions. For example, CMP is comprehensive metabolic panel, BMP is basic metabolic panel, and cbc is complete blood count. Generate all corresponding lab results in the same table. 
 
