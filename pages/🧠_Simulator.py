@@ -420,12 +420,12 @@ if st.session_state["password_correct"] == True:
     st.sidebar.divider()
     st.sidebar.subheader("Chart Access")
     
-    orders = st.sidebar.checkbox("Write Orders", value=False)
+    orders = st.sidebar.checkbox("Place Orders/Take Actions", value=False)
     if orders:
         with st.sidebar:
-            order_details = st.text_input("Orders (lung exam, x-ray, labs, consult, etc.)", key="order")
+            order_details = st.text_input("Examine lungs, CXR, CBC, furosemide 40 mg IV x 1, consult cardiology, etc.", key="order")
 
-            if st.button("Submit Orders"):
+            if st.button("Submit Orders/Take Actions"):
                 st.session_state.orders_placed = order_details + "\n\n" + st.session_state.orders_placed
                 prompt = orders_prompt.format(order_details=order_details, case_details=st.session_state.final_case)
                 orders_messages = [{"role": "user", "content": prompt}]
@@ -433,9 +433,9 @@ if st.session_state["password_correct"] == True:
                     orders_results = llm_call("anthropic/claude-3-sonnet", orders_messages)
                 st.session_state.results = orders_results['choices'][0]['message']['content'] + "\n\n" + st.session_state.results
             
-            with st.expander("Prior Orders", expanded = False):                
+            with st.expander("Completed Orders/Actions", expanded = False):                
                 st.write(st.session_state.orders_placed)
-            with st.expander("All Results", expanded = False):
+            with st.expander("All Results of Orders/Actions", expanded = False):
                 st.write(st.session_state.results)
 
     
