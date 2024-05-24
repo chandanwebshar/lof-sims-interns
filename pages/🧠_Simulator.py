@@ -101,12 +101,16 @@ def talk_stream(model, voice, input):
         base_url="https://api.openai.com/v1",
         api_key=api_key,
     )
-    response = client.audio.speech.create(
-    model= model,
-    voice= voice,
-    input= input,
-    )
-    response.stream_to_file("last_interviewer.mp3")
+    try:
+        response = client.audio.speech.create(
+        model= model,
+        voice= voice,
+        input= input,
+        )
+        response.stream_to_file("last_interviewer.mp3")
+    
+    except Exception as e:
+        st.write("The API is busy - should work in a moment for voice.")
     
 def autoplay_local_audio(filepath: str):
     # Read the audio file from the local file system

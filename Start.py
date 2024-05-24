@@ -271,7 +271,7 @@ if check_password():
             case_study_input = json.dumps(case_study_input)
         
         with col1: 
-            st.info("Click submit when ready to generate a case! A download button will appear in the next column once generated.")
+            st.info("Click submit when ready to generate a case!")
             submit_button = st.button("Submit")
 
         if submit_button:
