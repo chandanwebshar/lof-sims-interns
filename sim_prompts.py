@@ -145,7 +145,64 @@ For any potential gaps not covered in the provided details, include questions th
 **Final note:** Express emotion with pauses or expression of discomfort, e.g., Do not include stage instuctions, "with sadness".
 ```"""
 
-orders_prompt = """### Generate Results for a Patient Simulation Case with Specific Orders and Case Details
+orders_prompt = """### Generate Results for a Patient Simulation Case for New Orders
+
+**Task:** Leverage the new orders/actions provided, and the comprehensive patient case information, to generate accurate and consistent results for a simulated patient case. 
+If medications are part of the orders, confirm their administration and note any reactions. The focus is on returning precise results aligned with the case details, without including extraneous commentary.
+
+**Input Details:**
+
+- **New Orders/Actions**: {order_details}
+- **New Orders Date and Time**: {order_datetime}
+- **Case Scenario**: {case_details}
+- **Prior Results**: {prior_results}
+
+**Prompt:**
+
+Given the specified orders, alongside the patient context, create a set of results **only for the new specific orders/actions** that:
+- Are tailored to the provided patient case, reflecting an understanding of their condition and history.
+- Include clear outcomes for each lab test ordered, presented in a markdown table with date and time set to 10 minutes after the order date and time.
+- If medications were ordered, include a note on their administration status and any resultant reactions, maintaining consistency with the patient's detailed case. If no medications were ordered, exclude the medication administration section.
+- Provide findings for other included actions in the orders (e.g., lung examination) with findings tied to the patient’s case.
+
+**Guidelines:**
+
+- Ensure the results directly tie back to and are consistent with the patient scenario described.
+- Use the prior results from earlier orders for context to enhance the accuracy of the evolving case with the new results. 
+- Keep the response focused exclusively on providing the requested results for the new orders/actions. Avoid unrelated details or commentary.
+- Aim to enhance the realism of the simulation for students, fostering a deeper understanding of patient care and clinical decision-making processes.
+- Make your best match possible for any abbreviations used in Orders/Actions. For example, CMP is comprehensive metabolic panel, BMP is basic metabolic panel, and cbc is complete blood count. Generate all corresponding lab results in the same table. 
+
+**Generate results without commentary about efforts matching the case details.**
+
+**Example User Input:**
+- **Specific Orders**: Complete blood count (CBC), chest X-ray, administer 500 mg Acetaminophen
+- **Order Date and Time**: 2024-05-24 10:30 AM
+- **Case Scenario**: A 45-year-old male patient presenting with fever, cough, and shortness of breath.
+- **Prior Results**:
+
+
+**Sample Generated Output:**
+
+**Lab Results:**
+| Test                | Result      | Reference Range      | Date and Time          |
+|---------------------|-------------|----------------------|------------------------|
+| WBC                 | 12.5 x10^3/uL| 4.0-11.0 x10^3/uL    | 2024-05-24 10:40 AM    |
+| Hemoglobin          | 14.0 g/dL   | 13.5-17.5 g/dL       | 2024-05-24 10:40 AM    |
+| Platelet Count      | 200 x10^3/uL| 150-450 x10^3/uL     | 2024-05-24 10:40 AM    |
+
+**Chest X-ray Findings:**
+- Mild bilateral infiltrates suggestive of pneumonia.
+
+**Medication Administration:**
+- 500 mg Acetaminophen administered at 10:45 AM. No adverse reactions noted.
+
+**Physical Exam Findings:**
+- Lung Examination: Bilateral crackles heard in the lower lobes.
+
+"""
+
+orders_promp_old = """### Generate Results for a Patient Simulation Case with Specific Orders and Case Details
 
 **Task:** Leverage the specific orders provided, and the comprehensive patient case information, to generate accurate and consistent results for a simulated patient case. If medications are part of the orders, confirm their administration and note any reactions. The focus is on returning precise results aligned with the case details, without including extraneous commentary.
 
