@@ -232,6 +232,9 @@ if st.session_state["password_correct"] == True:
         
     if "last_audio_size" not in st.session_state:
         st.session_state["last_audio_size"] = 0
+        
+    if "h_and_p" not in st.session_state:
+        st.session_state["h_and_p"] = ""
 
             # Audio selection
     
@@ -440,11 +443,39 @@ if st.session_state["password_correct"] == True:
     # st.sidebar.download_button('Download the transcript!', html2, f'transcript.html', 'text/html')
     
     with st.sidebar:
+
+        h_and_p = st.checkbox("Generate a History and Physical (no A/P section)", value=False)
+        if h_and_p:
+            prompt = h_and_p_prompt.format(facesheet = extracted_section , conversation_transcript=st.session_state.conversation_string, orders_placed=st.session_state.orders_placed, results=st.session_state.results)
+            h_and_p_messages = [{"role": "user", "content": prompt}]
+            if st.sidebar.button("Create the History and Physical"):
+                with st.sidebar:
+                    with st.spinner("Writing History and Physical... Please wait."):
+                        try:
+                            h_and_p_response = llm_call("anthropic/claude-3-sonnet", h_and_p_messages)
+                        except Exception as e:
+                            st.error("Error formulating history and physical. Here are the error details: " + str(e))
+                st.session_state.h_and_p = h_and_p_response['choices'][0]['message']['content']
+                
+            if st.session_state.h_and_p:
+                with st.expander("History and Physical", expanded = False):
+                    st.write(st.session_state.h_and_p)
+                html = markdown2.markdown(st.session_state.h_and_p, extras=["tables"])
+                # st.sidebar.download_button('Download the assessment when done!', html, f'assessment.html', 'text/html')
+                with st.sidebar:
+                    if st.button("Generate H&P PDF file"):
+                        transcript_to_pdf(html, 'h_and_p.pdf')
+                        with open("h_and_p.pdf", "rb") as f:
+                            st.download_button("Download H&P PDF", f, "h_and_p.pdf")
+        
+        
+        
+        
+        st.divider()     
         if st.button("Generate Transcript PDF file"):
             transcript_to_pdf(html2, 'transcript.pdf')
             with open("transcript.pdf", "rb") as f:
-                st.download_button("Download Transcript PDF", f, "transcript.pdf")
-        st.divider()         
+                st.download_button("Download Transcript PDF", f, "transcript.pdf")    
         assess = st.checkbox("Assess Interaction", value=False)
     
     if assess:

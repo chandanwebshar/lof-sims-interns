@@ -218,6 +218,40 @@ Given the following inputs, assess the quality of the student's interactions wit
 **Please proceed to grade and assess the student's performance based on the provided rubric and inputs.**
 """
 
+
+h_and_p_prompt = """Please generate a comprehensive History and Physical (H&P) document up to the Assessment and Plan section based on the provided information. The document should include the following sections:
+
+1. Chief Complaint (CC)
+2. History of Present Illness (HPI)
+3. Past Medical History (PMH)
+4. Past Surgical History (PSH)
+5. Family History (FH)
+6. Social History (SH)
+7. Home Medications
+8. Allergies
+9. Review of Systems (ROS)
+10. Physical Exam (PE)
+11. Laboratory and Imaging Results
+12. Assessment and Plan
+
+The Assessment and Plan section should be present but left blank.
+
+**User Input:**
+
+- **Transcript of Student Interview:** {conversation_transcript}
+- **Patient Facesheet:** {facesheet}
+- **Physical Exam Findings, results, medications given:** {results}
+- **Orders:** {orders_placed}
+
+**Contextual Instructions:**
+
+- Ensure each section is clearly labeled and information is appropriately categorized.
+- Use medical terminology accurately.
+- Maintain a professional and clinical tone.
+- If no information was elicited, please state "N/A".
+- Do not fill in the Assessment and Plan section; it should remain blank for further completion.
+"""
+
 output_format_json = """{
     "case_id": 1,
     "title": "45 Year Old Man with Upper Abdominal Pain and Vomiting",
