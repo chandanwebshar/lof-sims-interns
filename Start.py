@@ -240,6 +240,9 @@ if check_password():
     if "edited_new_case" not in st.session_state:
         st.session_state["edited_new_case"] = ""
         
+    if "learner_tasks" not in st.session_state:
+        st.session_state["learner_tasks"] = learner_tasks
+        
     tab1, tab2 = st.tabs(["New Case", "Retrieve a Case"])
     
     with tab1:
@@ -269,6 +272,12 @@ if check_password():
                 'Case Primary Diagnosis': st.text_input("Primary Diagnosis", help = "The one or more primary diagnoses, e.g., Pulmonary Embolism"),
             }
             case_study_input = json.dumps(case_study_input)
+            with st.expander("Default Learner Tasks", expanded = False):
+                st.markdown(learner_tasks)  # Display the default tasks
+            if st.checkbox("Edit Learner Tasks", value=False, key = "initial_case_edit"):
+                learner_tasks = st.text_area("Learner Tasks for Assessment", height=200, help = "What the learner is expected to do, e.g., Perform a focused history and examination", value = learner_tasks)
+            st.session_state.learner_tasks = learner_tasks
+            # final_learner_tasks = st.text_area("Learner Tasks for Assessment", height=200, help = "What the learner is expected to do, e.g., Perform a focused history and examination", value = learner_tasks)
         
         with col1: 
             st.info("Click submit when ready to generate a case!")

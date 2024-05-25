@@ -112,6 +112,15 @@ For any potential gaps not covered in the provided details, include questions th
 **Final note:** Express emotion with pauses or expression of discomfort, e.g., Do not include stage instuctions, "with sadness".
 ```"""
 
+learner_tasks = """### Learner Tasks
+
+1. **Obtain an appropriately focused and detailed history based upon the chief complaint.**
+2. **Perform a pertinent physical examination based upon the chief complaint.**
+3. **Discuss your diagnostic impressions and next steps with the patient.**
+4. **Place appropriate orders for the patient.**
+5. **Review results with the patient and further next steps.**
+6. **Answer any questions the patient may have to the best of your ability.**"""
+
 sim_persona_old = """
 ### Create a Patient Persona for Case Study Simulation
 
@@ -236,7 +245,56 @@ Sample Generated Output:
 D-DIMER: 140.00, REF: D-DIMER: < 240.00 ng/mL DDU
 """
 
-assessment_prompt = """**Title:** Grading and Assessment of Interaction with a Simulated Patient
+assessment_prompt = """### Grading and Assessment of Interaction with a Simulated Patient
+
+**Instructions:**
+
+Given the following inputs, assess the quality of the student's interactions with the simulated patient:
+
+**Input Details:**
+
+- **Learner Tasks**: {learner_tasks}
+- **Student Levels**: {student_level} 
+- **Case Scenario**: {case_details} 
+- **Conversation Transcript**: {conversation_transcript} 
+- **Orders Placed**: {orders_placed} 
+- **Results**: {results}
+
+**Rubric:**
+
+1. **History Taking:**
+   - **Criteria:** Ability to obtain a focused and detailed history based on the chief complaint, appropriate sequence and relevance of questions, adaptation based on patient responses.
+   - **Scoring:** Rate on a scale of 1-5, considering the thoroughness and relevance of the history obtained.
+
+2. **Physical Examination:**
+   - **Criteria:** Execution of a pertinent physical examination based on the chief complaint, proper technique, and systematic approach.
+   - **Scoring:** Rate on a scale of 1-5, where 1 is inadequate and 5 demonstrates a thorough and systematic approach.
+
+3. **Diagnostic Impression and Communication:**
+   - **Criteria:** Discussion of diagnostic impressions and next steps with the patient, clarity and accuracy of communication, ability to maintain patient understanding and comfort.
+   - **Scoring:** Rate on a scale of 1-5, focusing on the clarity and effectiveness of communication regarding diagnosis and next steps.
+
+4. **Clinical Orders:**
+   - **Criteria:** Relevance and timeliness of orders placed in response to the patient’s condition, diagnostic reasoning, and judgment.
+   - **Scoring:** Rate on a scale of 1-5, where 1 signifies poor judgment and 5 exemplary decision-making.
+
+5. **Reviewing Results and Next Steps:**
+   - **Criteria:** Ability to review and explain results with the patient, discuss further steps, and answer patient questions effectively.
+   - **Scoring:** Rate on a scale of 1-5, focusing on clarity, patient comprehension, and thoroughness in addressing patient concerns.
+
+6. **Empathy and Patient Interaction:**
+   - **Criteria:** Presence of empathetic phrases, appropriate tone, active listening indicators, overall patient interaction quality.
+   - **Scoring:** Rate on a scale of 1-5, where 1 is lacking and 5 is exceptional in demonstrating empathy and patient-centered communication.
+
+*Final Assessment:*
+
+- Provide a summary of the strengths observed during the interaction.
+- Offer constructive feedback on areas for improvement.
+- Suggest specific actions or learning resources for enhancing skills in identified weak areas.
+
+**Please proceed to grade and assess the student's performance based on the provided rubric and inputs.**"""
+
+assessment_prompt_old = """**Title:** Grading and Assessment of Interaction with a Simulated Patient
 
 *Instructions:*
 
@@ -244,6 +302,7 @@ Given the following inputs, assess the quality of the student's interactions wit
 
 **Input Details:**
 
+- **Learner Tasks**: {learner_tasks}
 - **Student Levels**: {student_level} 
 - **Case Scenario**: {case_details} 
 - **Conversation Transcript**: {conversation_transcript} 

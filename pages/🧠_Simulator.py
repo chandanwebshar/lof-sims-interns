@@ -157,6 +157,7 @@ def extract_patient_door_chart_section(text):
 try:
     extracted_section = extract_patient_door_chart_section(st.session_state.final_case)
     st.info(extracted_section)
+    st.info(st.session_state.learner_tasks)
     if "messages" not in st.session_state:
         st.session_state.messages = [{"role": "system", "content": f'{sim_persona} Here are the specifics for your persona: {st.session_state.final_case}'}, ]
 except Exception as e:
@@ -490,7 +491,7 @@ if st.session_state["password_correct"] == True:
     
     if assess:
         student_level = st.sidebar.selectbox("Student Level", ["1st Year Medical Student", "2nd Year Medical Student", "3rd Year Medical Student", "4th Year Medical Student"])
-        prompt = assessment_prompt.format(student_level = student_level, case_details=st.session_state.final_case, conversation_transcript=st.session_state.conversation_string, orders_placed=st.session_state.orders_placed, results=st.session_state.results)
+        prompt = assessment_prompt.format(learner_tasks = st.session_state.learner_tasks, student_level = student_level, case_details=st.session_state.final_case, conversation_transcript=st.session_state.conversation_string, orders_placed=st.session_state.orders_placed, results=st.session_state.results)
         assessment_messages = [{"role": "user", "content": prompt}]
         if st.sidebar.button("Formulate Assessment"):
             with st.sidebar:
