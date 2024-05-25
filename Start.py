@@ -395,7 +395,7 @@ if check_password():
                         st.write(f'Here is the retrieved case name: {st.session_state.selected_case.saved_name}')
                         st.write(st.session_state.selected_case.content)
                         st.session_state.final_case = st.session_state.selected_case.content
-                    if st.checkbox("Edit Retrieved Case (Scroll Down)", value=False, key = "initial_case_edit"):
+                    if st.checkbox("Edit Retrieved Case (Scroll Down)", value=False, key = "retrieved_case_edit"):
                         st.session_state.expanded = False
                         st.warning('Please edit the case as needed while leaving other characters, e.g., "#" and "*", in place. Remember to update the Door Chart section at the bottom!')
                         updated_retrieved_case = st.text_area("Edit Case, enter control-enter or command-enter to save edits!", st.session_state.selected_case.content, height=1000)
