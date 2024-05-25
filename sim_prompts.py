@@ -356,14 +356,13 @@ The Assessment and Plan section should be present but left blank.
 
 **User Input:**
 
-- **Transcript of Student Interview:** {conversation_transcript}
-- **Patient Facesheet:** {facesheet}
-- **Physical Exam Findings, results, medications given:** {results}
-- **Orders:** {orders_placed}
+- **Door Chart, Transcript of Student Interview, Orders and Results Results:** {conversation_transcript}
 
 **Contextual Instructions:**
 
 - Ensure each section is clearly labeled and information is appropriately categorized.
+- Populate the physical exam section with findings identified.
+- Populate the Laboratory and Imaging Results section with summarized findings and explicit notable findings. 
 - Use medical terminology accurately.
 - Maintain a professional and clinical tone.
 - If no information was elicited, please state "N/A".

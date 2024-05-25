@@ -246,7 +246,7 @@ if st.session_state["password_correct"] == True:
     input_source = st.sidebar.radio("Choose to type or speak!", ("Text", "Microphone"), index=0)
     st.session_state.audio_off = st.sidebar.checkbox("Turn off voice response", value=False) 
     # Display chat messages from history on app rerun
-    conversation_str = extracted_section + "\n\n" + "______" + "\n\n" + "**Clinical Interview:**\n\n"
+    conversation_str = extracted_section + "**Learner Tasks:**\n\n" + st.session_state.learner_tasks + "\n\n" + "______" + "\n\n" + "**Clinical Interview:**\n\n"
     for message in st.session_state.messages:
         if message["role"] == "user":
             with st.chat_message(message["role"], avatar="👩‍⚕️"):
@@ -457,7 +457,7 @@ if st.session_state["password_correct"] == True:
 
         h_and_p = st.checkbox("Generate a History and Physical (no A/P section)", value=False)
         if h_and_p:
-            prompt = h_and_p_prompt.format(facesheet = extracted_section , conversation_transcript=st.session_state.conversation_string, orders_placed=st.session_state.orders_placed, results=st.session_state.results)
+            prompt = h_and_p_prompt.format(conversation_transcript=st.session_state.conversation_string)
             h_and_p_messages = [{"role": "user", "content": prompt}]
             if st.sidebar.button("Create the History and Physical"):
                 with st.sidebar:
