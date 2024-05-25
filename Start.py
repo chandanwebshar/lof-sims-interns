@@ -269,6 +269,7 @@ if check_password():
                 'Case Primary Diagnosis': st.text_input("Primary Diagnosis", help = "The one or more primary diagnoses, e.g., Pulmonary Embolism"),
             }
             case_study_input = json.dumps(case_study_input)
+            final_learner_tasks = st.text_area("Learner Tasks", height=200, help = "What the learner is expected to do, e.g., Perform a focused history and examination", value = learner_tasks)
         
         with col1: 
             st.info("Click submit when ready to generate a case!")
