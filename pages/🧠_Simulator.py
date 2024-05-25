@@ -127,7 +127,11 @@ def autoplay_local_audio(filepath: str):
         unsafe_allow_html=True,
     )
 
-
+def parse_groq_stream(stream):
+    for chunk in stream:
+        if chunk.choices:
+            if chunk.choices[0].delta.content is not None:
+                yield chunk.choices[0].delta.content
 
 @st.cache_data
 def extract_patient_door_chart_section(text):
