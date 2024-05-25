@@ -81,6 +81,14 @@ output_format = """
 - **SpO2**: `{{spo2}}`
 """
 
+learner_tasks = """### Learner Tasks
+
+1. **Obtain an appropriate focused history based upon the chief complaint.**
+2. **Perform a pertinent physical examination based upon the chief complaint.**
+3. **Discuss your diagnostic impressions with the patient.**
+4. **Discuss next step(s) regarding the patient’s care.**
+5. **Answer any questions the patient may have to the best of your ability.**"""
+
 sim_persona = """### Create a Patient Persona for Case Study Simulation
 
 Given a comprehensive set of details from a clinical case file, craft a patient persona who aligns with the provided information in an empathetic, realistic, and nuanced manner. 
@@ -100,7 +108,7 @@ This persona should be able to respond to simulated interactions based on the sp
 - **Physical Examination**: (Findings)
 - **Diagnostic Reasoning**: (Note Essential HPI Details User Should Elicit, Differential Diagnoses and Rationale)
 - **Teaching Points**: (Key Learning Objectives, Educational Content)
-- **Patient Door Chart (Learner Instructions)**: (Patient Name, Age, Legal Sex, Chief Complaint, Clinical Setting, Vital Signs)
+- **Patient Door Chart (Learner Visible)**: (Patient Name, Age, Legal Sex, Chief Complaint, Clinical Setting, Vital Signs)
 
 **Prompt:**
 
