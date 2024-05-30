@@ -30,7 +30,7 @@ def assign_random_voice(sex):
     """
     # List of possible voices
     male_voices = [ 'echo', 'fable', 'onyx' ]
-    female_voices = ['alloy',  'nova', 'shimmer']
+    female_voices = [ 'nova', 'shimmer']
     
     if sex == 'male':
         voices = male_voices
