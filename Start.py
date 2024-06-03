@@ -249,7 +249,7 @@ if check_password():
     
     with tab1:
 
-        col1, col2, col3 = st.columns([1, 1, 4])
+        col1, col2, col3 = st.columns([2, 2, 5])
 
         with col1:    
             st.info("**Include desired history in the text paragraph. The AI will generate additional details as needed to draft an educational case.**")
