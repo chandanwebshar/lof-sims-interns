@@ -54,6 +54,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state='auto'
 )
+with st.sidebar:
+    st.image("static/er_bays.jpeg", use_column_width=True)
 
 class PDF(FPDF):
     def header(self):
