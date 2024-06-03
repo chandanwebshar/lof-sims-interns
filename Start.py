@@ -171,21 +171,30 @@ def get_records(model, search_text=None, saved_name=None, role=None, specialty=N
     return query.all()
 
 def llm_call(model, messages):
-    response = requests.post(
-        url="https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": "Bearer " + st.secrets["OPENROUTER_API_KEY"],  # Fixed to correct access to secrets
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://fsm-gpt-med-ed.streamlit.app",  # To identify your app
-            "X-Title": "lof-sims",
-        },
-        data=json.dumps({
-            "model": model,
-            "messages": messages,
-        })
-    )
+    
+    try:
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": "Bearer " + st.secrets["OPENROUTER_API_KEY"],  # Fixed to correct access to secrets
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://fsm-gpt-med-ed.streamlit.app",  # To identify your app
+                "X-Title": "lof-sims",
+            },
+            data=json.dumps({
+                "model": model,
+                "messages": messages,
+            })
+        )
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error - make sure bills are paid!: {e}")
+        return None
     # Extract the response content
-    response_data = response.json()
+    try:
+        response_data = response.json()
+    except json.JSONDecodeError:
+        st.error(f"Error decoding JSON response: {response.content}")
+        return None
     return response_data  # Adjusted to match expected JSON structure
 
 def check_password():

@@ -446,6 +446,7 @@ if st.session_state["password_correct"] == True:
                 orders_messages = [{"role": "user", "content": prompt}]
                 with st.spinner("Transmitting Orders... Please wait."):
                     orders_results = llm_call("openai/gpt-4o", orders_messages)
+                # st.write(orders_results)
                 st.session_state.results = orders_results['choices'][0]['message']['content'] + "\n\n" + st.session_state.results
             
             with st.expander("Completed Orders/Actions", expanded = False):                

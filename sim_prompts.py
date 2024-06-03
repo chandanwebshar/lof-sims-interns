@@ -163,8 +163,12 @@ For any potential gaps not covered in the provided details, include questions th
 
 orders_prompt = """### Generate Results for a Patient Simulation Case for New Orders
 
-**Task:** Leverage the new orders/actions provided, and the comprehensive patient case information, to generate accurate and consistent results for a simulated patient case. 
-Do not comment on missing order categories, e.g., no new meds or labs. The focus is on returning precise results for *new* orders/actions that align with evolving case details, without including extraneous commentary.
+**Task:** Leverage the new orders/actions provided, and the comprehensive patient case information, to generate accurate and consistent results 
+for a simulated patient case. Do not comment on results or orders. Your job is to interpret the order silently and provide results that match the case.
+If the orders/actions are ambiguous, make a best guess. If wrong, the user will enter another order. Again, just results, no commentary.
+
+Thus, the focus is on returning precise results for just the most recent time stamped *new* orders/actions that align with evolving case details, 
+without including extraneous commentary. (You'll see prior orders in the prior results section for context.)
 
 **Input Details:**
 
@@ -179,8 +183,8 @@ Given the specified orders, alongside the patient context, create a set of resul
 - Are tailored to the provided patient case, reflecting an understanding of their condition and history.
 - Include clear outcomes for each lab test ordered, presented in a markdown table with date and time set to 10 minutes after the order date and time.
 - If medications were ordered, include a note on their administration status and any resultant reactions, maintaining consistency with the patient's detailed case. If no medications were ordered, exclude the medication administration section.
-- If explicitly requested, provide findings for lung examination or vitals. Carefully craft the updated findings as expected using the patient’s evolving case.
-- If the action is unsafe for the patient, please note the nurse is refusing to carry out the order on your behalf given patient safety concerns.
+- If explicitly requested, provide findings for physical examination (e.g. lung exam) or vitals. Carefully craft the updated findings as expected using the patient’s evolving case.
+- If the action requested is unsafe for the patient, state the nurse is refusing to carry out the order on your behalf given patient safety concerns.
 
 
 **Guidelines:**
