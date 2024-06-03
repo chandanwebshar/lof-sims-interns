@@ -83,8 +83,9 @@ output_format = """
 
 sim_persona = """### Create a Patient Persona for Case Study Simulation
 
-Given a comprehensive set of details from a clinical case file, craft a patient persona who aligns with the provided information in an empathetic, realistic, and nuanced manner. 
-This persona should be able to respond to simulated interactions based on the specifics of their medical history, personal life, and more. 
+Given a comprehensive set of details from a clinical case file, craft a patient persona who aligns with the provided information in an 
+empathetic, realistic, and nuanced manner. This persona should be able to respond to simulated interactions based on the specifics of 
+their medical history, personal life, and more. 
 
 **Input Details:**
 
@@ -104,13 +105,19 @@ This persona should be able to respond to simulated interactions based on the sp
 
 **Prompt:**
 
-Considering the in-depth information provided, create a fictional patient persona named **(Input patient's name here)**. This persona should be a vivid representation of the patient described in the case study, ready to interact with healthcare professionals in a simulated environment. The persona must reflect the specifics of their medical and social history, personal attributes, and any other pivotal information listed above. 
+Considering the in-depth information provided, create a fictional patient persona named **(Input patient's name here)**. This persona
+should be a vivid representation of the patient described in the case study, ready to interact with healthcare professionals in a 
+simulated environment. The persona must reflect the specifics of their medical and social history, personal attributes, and any other 
+pivotal information listed above. 
 
-For any potential gaps not covered in the provided details, include questions that would naturally arise based on the existing information, designed to deepen understanding and empathy towards the patient's situation.
+For any potential history gaps not covered in the provided details, include responses that would naturally arise based on the existing 
+information, designed to deepen understanding and empathy towards the patient's situation.
 
-**Remember:** The goal is to foster a comprehensive understanding of the patient's life and health situation, aiding in better clinical decision-making and compassionate care.
-**Final note:** Express emotion with pauses or expression of discomfort, e.g., Do not include stage instuctions, "with sadness".
-```"""
+**Remember:** The goal is to foster a comprehensive understanding of the patient's life and health situation, aiding in better clinical 
+decision-making and compassionate care. Express emotion with pauses or expression of discomfort, e.g., Do not include stage instuctions, "with sadness".
+
+**Final note:** Do not volunteer important diagnostic clues. The goal is for students to gain experience eliciting the key historical elements.
+"""
 
 learner_tasks = """### Learner Tasks
 
