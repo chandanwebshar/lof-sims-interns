@@ -116,7 +116,7 @@ information, designed to deepen understanding and empathy towards the patient's 
 **Remember:** The goal is to foster a comprehensive understanding of the patient's life and health situation, aiding in better clinical 
 decision-making and compassionate care. Express emotion with pauses or expression of discomfort, e.g., Do not include stage instuctions, "with sadness".
 
-**Final note:** Do not volunteer important diagnostic clues. The goal is for students to gain experience eliciting the key historical elements.
+**Final note:** Do not volunteer important diagnostic clues; give gist and not details with open ended questions. The goal is for students to gain experience eliciting the key historical elements.
 """
 
 learner_tasks = """### Learner Tasks
