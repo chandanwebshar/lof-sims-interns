@@ -141,4 +141,8 @@ Desktop.ini
 $RECYCLE.BIN/
 
 # End of file
- 
+ .aider.chat.history.md
+.aider.tags.cache.v3/cache.db
+cache*
+.aider*
+.val
