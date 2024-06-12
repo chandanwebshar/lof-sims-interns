@@ -5,3 +5,5 @@ case.pdf
 assessment.pdf
 transcript.pdf
 *.pdf
+env
+__pycache__
