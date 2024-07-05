@@ -6,9 +6,7 @@ from sim_prompts import *  # Ensure this import provides the needed functionalit
 from bs4 import BeautifulSoup
 from fpdf import FPDF
 from sqlalchemy import create_engine, Column, Integer, String, Text, MetaData, Index
-# from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, declarative_base
-# from st_pages import show_pages, hide_pages, Page
 
 # Database setup
 DATABASE_URL = "sqlite:///app_data.db"  # SQLite database
@@ -16,7 +14,6 @@ DATABASE_URL = "sqlite:///app_data.db"  # SQLite database
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 session = Session()
-# Base = declarative_base()
 Base = declarative_base()
 
 # Define the models
@@ -125,7 +122,9 @@ def html_to_pdf(html_content, name):
             pdf.add_page()
     
     # Output the PDF
-    pdf.output(name)
+    pdf_path = f"/tmp/{name}"
+    pdf.output(pdf_path)
+    return pdf_path
 
 def init_session():
     if "final_case" not in st.session_state:
@@ -136,6 +135,8 @@ def init_session():
         st.session_state["retrieved_name"] = ""
     if "selected_case_id" not in st.session_state:
         st.session_state["selected_case_id"] = -1
+    if "checklist" not in st.session_state:
+        st.session_state["checklist"] = ""
 
 # Function to save a transcript
 def save_transcript(transcript_content, role, specialty):
@@ -171,14 +172,13 @@ def get_records(model, search_text=None, saved_name=None, role=None, specialty=N
     return query.all()
 
 def llm_call(model, messages):
-    
     try:
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
-                "Authorization": "Bearer " + st.secrets["OPENROUTER_API_KEY"],  # Fixed to correct access to secrets
+                "Authorization": "Bearer " + st.secrets["OPENROUTER_API_KEY"],
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://fsm-gpt-med-ed.streamlit.app",  # To identify your app
+                "HTTP-Referer": "https://fsm-gpt-med-ed.streamlit.app",
                 "X-Title": "lof-sims",
             },
             data=json.dumps({
@@ -195,7 +195,7 @@ def llm_call(model, messages):
     except json.JSONDecodeError:
         st.error(f"Error decoding JSON response: {response.content}")
         return None
-    return response_data  # Adjusted to match expected JSON structure
+    return response_data
 
 def check_password():
     """Returns `True` if the user had the correct password."""
@@ -263,20 +263,6 @@ if check_password():
         with col1:    
             st.info("**Include desired history in the text paragraph. The AI will generate additional details as needed to draft an educational case.**")
                 
-                
-            # learning_objectives = st.multiselect(
-            #     "Select one or more learning objectives; default is a focused history/examination",
-            #     [
-            #         "Perform a focused history and examination",
-            #         "Provide patient education",
-            #         "Demonstrate effective interpersonal skills",
-            #         "Determine a Dx and DDx",
-            #         "Determine a plan for management",
-            #         "Document the patient case"
-            #     ], default="Perform a focused history and examination",
-            #     help="Choose the learning objectives relevant to this case study."
-            # )
-
             case_study_input = {
                 'Case Title': st.text_input("Case Study Title", help="Presenting symptom, e.g."),
                 'Case Description': st.text_area("Case Description", height=200, help = "As detailed or brief as desired, e.g., 65F with acute chest pain..."),
@@ -288,7 +274,6 @@ if check_password():
             if st.checkbox("Edit Learner Tasks", value=False, key = "initial_case_edit"):
                 learner_tasks = st.text_area("Learner Tasks for Assessment", height=200, help = "What the learner is expected to do, e.g., Perform a focused history and examination", value = learner_tasks)
             st.session_state.learner_tasks = learner_tasks
-            # final_learner_tasks = st.text_area("Learner Tasks for Assessment", height=200, help = "What the learner is expected to do, e.g., Perform a focused history and examination", value = learner_tasks)
         
         with col1: 
             st.info("Click submit when ready to generate a case!")
@@ -324,26 +309,141 @@ if check_password():
                             st.success("Case Edits Saved!")
                             if edited_new_case:
                                 st.session_state["final_case"] = edited_new_case
-                        # st.session_state.sidebar_state = 'expanded'
                         st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator (including any saved edits)", icon="🧠")
                 else:
                     st.session_state["final_case"] = st.session_state.response_markdown
+
+                if st.button("Generate Checklist for Students"):
+                    checklist_prompt = [
+                        {"role": "system", "content": """
+                        Generate a case checklist for the given case details in the following format:
+                        
+                        Case Dashboard - Pertinent history and physical
+
+                        The following history and physical examination are the important points of the case. The standard answer for anything not listed below is “no” or “I have not noticed that”. You may improvise if students ask you questions where answers are not present.
+
+                        Presenting Situation when learner enters the room: 
+
+                        Patient behavior: If this is a manikin case so you won't be able to move or show facial expressions. Make comments from time to time “I just can't get comfortable” or “this hurts a lot”.
+
+                        HPI:
+
+                        Onset: 
+                        Location: 
+                        Duration: 
+                        Character:
+                        Aggravating/ Alleviating factors: 
+                        Radiation: 
+                        Timing
+                        Severity:  
+
+                        Additional context
+
+                        PMHx:
+
+                        -Active problems:  
+                        -Inactive problems:  
+                        -Hospitalizations: 
+                        -Surgical History: 
+                        -Immunizations:  
+
+                        SHx:
+
+                        __Tobacco:
+                        __Alcohol:
+                        __Substances:
+                        __Diet:
+                        __Exercise:
+                        __Sexual activity:
+                        __Home life/ safety:
+                        __Mood:
+                        __Context (other elements that add to the patient’s story)
+
+                        FHx:
+
+                        Parents: 
+                        Siblings:   
+
+                        Medications: 
+
+                        -dose, frequency, (Rx and OTC)
+
+                        Allergies:
+
+                        Meds/ environmental - type of reaction
+
+                        Review of Systems (ROS) -
+
+                        Include pertinent + and negatives and elaborate where needed.
+
+                        General:  weakness, fatigue, weight change, appetite, sleeping habits, chills, fever, night sweats
+                        Eyes:  acuity, glasses/ contacts, discharge, photophobia, blurring, diplopia, spots, discharge, floaters, glaucoma, cataracts
+                        ENT: EARS:  hearing changes, tinnitus, discharge, pain, vertigo,  NOSE:  congestion, hay fever, polyps, epistaxis, MOUTH:  painful teeth or gums, sore tongue, sore throat, hoarseness
+                        Cardiovascular:  CARDIAC:  chest pain, hypertension, dyspnea, orthopnea, exercise intolerance, PND, murmur, leg cramps, swollen ankles/ edema.  VASCULAR:  varicosities, thrombophlebitis, cramps, claudication, finger pallor or cyanosis, swollen ankles/ edema
+                        Respiratory:  dyspnea, chest pain, cough, sputum – color, quality, quantity; hemoptysis
+                        Gastrointestinal: dysphasia, food intolerance, hematemesis, bloating, dyspepsia, frequent belching, ulcer, nausea, vomiting, early satiety, bowel habits, stool character, stool color, blood  per rectum, hemorrhoids, jaundice, liver ds, gall bladder ds)
+                        Genitourinary:  dysuria, frequency, hesitancy, urgency, nocturia, polyuria, infections, incontinence, pyuria, hematuria.
+                        Musculoskeletal: joint pain, stiffness, swelling, arthritis, gout, backache, muscle pain or stiffness, scoliosis
+                        Neurological:  fainting, blackouts, headaches, seizures, local weakness, numbness, tremors, coordination, memory or attention deficits
+                        Psychiatric: depression, confusion, anxiety, tension, difficulty concentrating, recent loss, thought disorders
+                        Integument/ Skin:rashes, lesions, easy bruising, pruritus, lumps, color change, hair or nail changes.  Breasts lumps, pain, discharge
+                        Endocrine: heat or cold intolerance, excessive sweating, polyuria, polydypsia, polyphagia, changes to hair/nail texture
+                        Hematopoietic/ Lymphatic: anemia, bruising, bleeding, lymphadenopathy
+                        Allergy/ Immunology: hives, swelling of airway, dyspnea, sensitivities to certain foods or environmental triggers, hayfever, asthma
+
+                        Physical Exam (pertinent only)
+
+                        Below are systems and answers for what the learner might perform during the examination. If they do something other than this during the exam or ask about a finding state “normal or unremarkable”. Where it states Direct learner to examine the manikin this means the manikin is capable of the finding. However, if there is confusion you can provide verbal details to help.
+
+                        Vital Signs (on monitor and taken at triage prior to encounter)
+
+                        BP
+                        HR
+                        RR
+                        SPO2
+                        Temp
+                        Pain (0-10)
+
+                        Airway and Breathing: Direct students to observe the manikin if they ask. “Airway is unobstructed, breathing is non-labored at a rate of 18 chest rise is symmetric. Direct them to auscultate lungs if they are asking for breath sounds.
+                        HEENT: Normocephalic, atraumatic, Pupils Equal Round and Reactive to Light (PERRL - penlight shine in eyes), Extra-Ocular Movements inTact (EOMI - H Test), oropharynx is clear.
+                        Neck: No masses, trachea midline, supple with full range of motion without C-spine tenderness.
+                        Cardiovascular - Pulses: 2+ in all extremities with capillary refill < 2 second
+                        Cardiovascular: - Heart: S1 S2 no S3 or S4 or murmurs
+                        Pulmonary - Lungs are clear to auscultation bilaterally, no retractions, no wheezes, rhonchi or rales. All other lung maneuvers are normal
+                        Abdominal Exam: Inspection, auscultation, percussion, palpation, specialty maneuvers
+                        Genitourinary: Normal genitalia, no masses, no hernias, no discharge.
+                        Back and Flank Exam: No CVA tenderness, no tenderness to the cervical, thoracic or lumbar spine.
+                        Musculoskeletal Exam: No clubbing, cyanosis or edema; normal range of motion without bony point tenderness
+                        Neurologic: Awake, alert, speech clear. CN 2-12 in tact, no gait or coordination problems. Expected sensation, bulk, tone, and strength in all extremities.
+                        Skin Exam: Warm and dry, no rashes
+                        Psychological: Normal mood and affect with intact attention and calculation.
+                        """},
+                        {"role": "user", "content": st.session_state.final_case}
+                    ]
+                    checklist_response = llm_call(model_choice, checklist_prompt)
+                    checklist_content = checklist_response['choices'][0]['message']['content']
+                    st.session_state.checklist = checklist_content
+                    st.success("Checklist Generated!")
+                    with st.expander("View Checklist", expanded=True):
+                        st.markdown(st.session_state.checklist)
+
+                    checklist_html = markdown2.markdown(st.session_state.checklist, extras=["tables"])
+                    pdf_path = html_to_pdf(checklist_html, 'checklist.pdf')
+                    with open(pdf_path, "rb") as f:
+                        st.download_button("Download Checklist PDF", f, "checklist.pdf")
                 
                 if st.session_state.final_case !="":        
                     case_html = markdown2.markdown(st.session_state.final_case, extras=["tables"])
-                        # st.download_button('Download HTML Case file', html, f'case.html', 'text/html')
                         
-                    # st.info("Download the Current Case:")
                     if st.checkbox("Generate Case PDF file"):
-                        html_to_pdf(case_html, 'case.pdf')
-                        with open("case.pdf", "rb") as f:
+                        pdf_path = html_to_pdf(case_html, 'case.pdf')
+                        with open(pdf_path, "rb") as f:
                             st.download_button("Download Case PDF", f, "case.pdf")
 
                 if st.session_state["final_case"] != "":
                     if st.button("Send case to the simulator!"):
-                        st.session_state["final_case"] = st.session_state.final_case  # Ensure the case is correctly set
+                        st.session_state["final_case"] = st.session_state.final_case
                         st.session_state["retrieved_name"] = st.session_state.retrieved_name
-                        # st.session_state.sidebar_state = 'expanded'
                         st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator", icon="🧠")
 
         with col3:
@@ -353,10 +453,6 @@ if check_password():
                 if st.checkbox("Save Case to the Database for Future Use"):
                     case_details = st.text_area("Case Details to Save to the Database for Future Use", value=st.session_state.final_case)
                     saved_name = st.text_input("Saved Name (Required to save case)")
-                    # selected_role = st.selectbox("Role", roles)
-                    # specialty = ""
-                    # if selected_role in ["Resident", "Fellow", "Attending"]:
-                    #     specialty = st.text_input("Specialty", "")
 
                     if st.button("Save Case to the Database for future use!"):
                         if saved_name:
@@ -364,11 +460,7 @@ if check_password():
                             st.success("Case Details saved successfully!")
                         else:
                             st.error("Saved Name is required to save the case")
-
-
     
-    
-    # Initialize session state variables
     # Initialize session state variables
     if "search_results" not in st.session_state:
         st.session_state.search_results = []
@@ -383,11 +475,8 @@ if check_password():
             st.header("Retrieve Records")
             search_text = st.text_input("Search Text")
             search_saved_name = st.text_input("Search by Saved Name")
-            # search_role = st.selectbox("Search by Role", [""] + roles)
             search_role =""
             search_specialty = ""
-            if search_role in ["Resident", "Fellow", "Attending"]:
-                search_specialty = st.text_input("Search by Specialty", "")
 
             if st.button("Search Cases"):
                 st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name)
@@ -395,7 +484,6 @@ if check_password():
             if st.session_state.search_results:
                 st.subheader("Cases Found")
                 for i, case in enumerate(st.session_state.search_results):
-                    # st.write(f"Saved Name: {case.saved_name}, Role: {case.role}, Specialty: {case.specialty}")
                     st.write(f"{i+1}. {case.saved_name}")
                     if st.button(f"View (and Select) Case {i+1}", key=f"select_case_{i}"):
                         st.session_state.selected_case = case
@@ -417,19 +505,13 @@ if check_password():
                             st.session_state.final_case = updated_retrieved_case
                             st.info("Case Edits Saved!")   
                             updated_case_html = markdown2.markdown(st.session_state.final_case, extras=["tables"])
-                            html_to_pdf(updated_case_html, 'updated_case.pdf')
-                            with open("updated_case.pdf", "rb") as f:
+                            pdf_path = html_to_pdf(updated_case_html, 'updated_case.pdf')
+                            with open(pdf_path, "rb") as f:
                                 st.download_button("Download Updated Case PDF", f, "updated_case.pdf")
                             if make_new_entry:
                                 if saved_name:
                                     save_case_details(st.session_state.final_case, saved_name)
                                     st.success("Case Details saved successfully!")
                                 else:
-                                    st.error("Saved Name is required to save the case")
-                    # st.session_state.sidebar_state = 'expanded'        
+                                    st.error("Saved Name is required to save the case")     
                     st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator ", icon="🧠")
-            
-            
-
-
-
