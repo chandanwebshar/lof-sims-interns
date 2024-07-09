@@ -135,8 +135,10 @@ def init_session():
         st.session_state["retrieved_name"] = ""
     if "selected_case_id" not in st.session_state:
         st.session_state["selected_case_id"] = -1
-    if "checklist" not in st.session_state:
-        st.session_state["checklist"] = ""
+    if "checklist_template" not in st.session_state:
+        st.session_state["checklist_template"] = generate_checklist_template()
+    if "chat_history" not in st.session_state:
+        st.session_state["chat_history"] = []
 
 # Function to save a transcript
 def save_transcript(transcript_content, role, specialty):
@@ -189,7 +191,6 @@ def llm_call(model, messages):
     except requests.exceptions.RequestException as e:
         st.error(f"Error - make sure bills are paid!: {e}")
         return None
-    # Extract the response content
     try:
         response_data = response.json()
     except json.JSONDecodeError:
@@ -209,22 +210,63 @@ def check_password():
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
-        # First run, show input for password.
         st.text_input(
             "Password", type="password", on_change=password_entered, key="password"
         )
         st.write("*Please contact David Liebovitz, MD if you need an updated password for access.*")
         return False
     elif not st.session_state["password_correct"]:
-        # Password not correct, show input + error.
         st.text_input(
             "Password", type="password", on_change=password_entered, key="password"
         )
         st.error("😕 Password incorrect")
         return False
     else:
-        # Password correct.
         return True
+
+def generate_checklist_template():
+    checklist_template = """
+    HPI:
+    
+    Onset: 
+    
+    Location: 
+    
+    Duration: 
+    
+    Character:
+    
+    Aggravating/ Alleviating factors: 
+    
+    Radiation: 
+    
+    Timing:
+    
+    Severity:
+    """
+    return checklist_template
+
+def update_checklist_with_answers(user_question, checklist_template):
+    answer_prompt = [
+        {
+            "role": "system",
+            "content": """
+            Based on the case details and the user's question, provide specific answers to populate the checklist. Ensure the answers are detailed and accurate.
+            """
+        },
+        {
+            "role": "user",
+            "content": f"Case details: {st.session_state.final_case}"
+        },
+        {
+            "role": "user",
+            "content": f"User question: {user_question}"
+        }
+    ]
+    answer_response = llm_call(model_choice, answer_prompt)
+    answer_content = answer_response['choices'][0]['message']['content']
+    updated_checklist = checklist_template + "\n\n" + answer_content
+    return updated_checklist
 
 st.title("Case Generator for Simulations")
 init_session()
@@ -270,7 +312,7 @@ if check_password():
             }
             case_study_input = json.dumps(case_study_input)
             with st.expander("Default Learner Tasks", expanded = False):
-                st.markdown(learner_tasks)  # Display the default tasks
+                st.markdown(learner_tasks)
             if st.checkbox("Edit Learner Tasks", value=False, key = "initial_case_edit"):
                 learner_tasks = st.text_area("Learner Tasks for Assessment", height=200, help = "What the learner is expected to do, e.g., Perform a focused history and examination", value = learner_tasks)
             st.session_state.learner_tasks = learner_tasks
@@ -314,124 +356,16 @@ if check_password():
                     st.session_state["final_case"] = st.session_state.response_markdown
 
                 if st.button("Generate Checklist for Students"):
-                    checklist_prompt = [
-                        {"role": "system", "content": """
-                        Generate a case checklist for the given case details in the following format:
-                        
-                        Case Dashboard - Pertinent history and physical
+                    st.session_state.checklist_template = generate_checklist_template()
+                    st.success("Checklist Template Generated!")
+                    with st.expander("View Checklist Template", expanded=True):
+                        st.markdown(st.session_state.checklist_template)
 
-                        The following history and physical examination are the important points of the case. The standard answer for anything not listed below is “no” or “I have not noticed that”. You may improvise if students ask you questions where answers are not present.
-
-                        Presenting Situation when learner enters the room: 
-
-                        Patient behavior: If this is a manikin case so you won't be able to move or show facial expressions. Make comments from time to time “I just can't get comfortable” or “this hurts a lot”.
-
-                        HPI:
-
-                        Onset: 
-                        Location: 
-                        Duration: 
-                        Character:
-                        Aggravating/ Alleviating factors: 
-                        Radiation: 
-                        Timing
-                        Severity:  
-
-                        Additional context
-
-                        PMHx:
-
-                        -Active problems:  
-                        -Inactive problems:  
-                        -Hospitalizations: 
-                        -Surgical History: 
-                        -Immunizations:  
-
-                        SHx:
-
-                        __Tobacco:
-                        __Alcohol:
-                        __Substances:
-                        __Diet:
-                        __Exercise:
-                        __Sexual activity:
-                        __Home life/ safety:
-                        __Mood:
-                        __Context (other elements that add to the patient’s story)
-
-                        FHx:
-
-                        Parents: 
-                        Siblings:   
-
-                        Medications: 
-
-                        -dose, frequency, (Rx and OTC)
-
-                        Allergies:
-
-                        Meds/ environmental - type of reaction
-
-                        Review of Systems (ROS) -
-
-                        Include pertinent + and negatives and elaborate where needed.
-
-                        General:  weakness, fatigue, weight change, appetite, sleeping habits, chills, fever, night sweats
-                        Eyes:  acuity, glasses/ contacts, discharge, photophobia, blurring, diplopia, spots, discharge, floaters, glaucoma, cataracts
-                        ENT: EARS:  hearing changes, tinnitus, discharge, pain, vertigo,  NOSE:  congestion, hay fever, polyps, epistaxis, MOUTH:  painful teeth or gums, sore tongue, sore throat, hoarseness
-                        Cardiovascular:  CARDIAC:  chest pain, hypertension, dyspnea, orthopnea, exercise intolerance, PND, murmur, leg cramps, swollen ankles/ edema.  VASCULAR:  varicosities, thrombophlebitis, cramps, claudication, finger pallor or cyanosis, swollen ankles/ edema
-                        Respiratory:  dyspnea, chest pain, cough, sputum – color, quality, quantity; hemoptysis
-                        Gastrointestinal: dysphasia, food intolerance, hematemesis, bloating, dyspepsia, frequent belching, ulcer, nausea, vomiting, early satiety, bowel habits, stool character, stool color, blood  per rectum, hemorrhoids, jaundice, liver ds, gall bladder ds)
-                        Genitourinary:  dysuria, frequency, hesitancy, urgency, nocturia, polyuria, infections, incontinence, pyuria, hematuria.
-                        Musculoskeletal: joint pain, stiffness, swelling, arthritis, gout, backache, muscle pain or stiffness, scoliosis
-                        Neurological:  fainting, blackouts, headaches, seizures, local weakness, numbness, tremors, coordination, memory or attention deficits
-                        Psychiatric: depression, confusion, anxiety, tension, difficulty concentrating, recent loss, thought disorders
-                        Integument/ Skin:rashes, lesions, easy bruising, pruritus, lumps, color change, hair or nail changes.  Breasts lumps, pain, discharge
-                        Endocrine: heat or cold intolerance, excessive sweating, polyuria, polydypsia, polyphagia, changes to hair/nail texture
-                        Hematopoietic/ Lymphatic: anemia, bruising, bleeding, lymphadenopathy
-                        Allergy/ Immunology: hives, swelling of airway, dyspnea, sensitivities to certain foods or environmental triggers, hayfever, asthma
-
-                        Physical Exam (pertinent only)
-
-                        Below are systems and answers for what the learner might perform during the examination. If they do something other than this during the exam or ask about a finding state “normal or unremarkable”. Where it states Direct learner to examine the manikin this means the manikin is capable of the finding. However, if there is confusion you can provide verbal details to help.
-
-                        Vital Signs (on monitor and taken at triage prior to encounter)
-
-                        BP
-                        HR
-                        RR
-                        SPO2
-                        Temp
-                        Pain (0-10)
-
-                        Airway and Breathing: Direct students to observe the manikin if they ask. “Airway is unobstructed, breathing is non-labored at a rate of 18 chest rise is symmetric. Direct them to auscultate lungs if they are asking for breath sounds.
-                        HEENT: Normocephalic, atraumatic, Pupils Equal Round and Reactive to Light (PERRL - penlight shine in eyes), Extra-Ocular Movements inTact (EOMI - H Test), oropharynx is clear.
-                        Neck: No masses, trachea midline, supple with full range of motion without C-spine tenderness.
-                        Cardiovascular - Pulses: 2+ in all extremities with capillary refill < 2 second
-                        Cardiovascular: - Heart: S1 S2 no S3 or S4 or murmurs
-                        Pulmonary - Lungs are clear to auscultation bilaterally, no retractions, no wheezes, rhonchi or rales. All other lung maneuvers are normal
-                        Abdominal Exam: Inspection, auscultation, percussion, palpation, specialty maneuvers
-                        Genitourinary: Normal genitalia, no masses, no hernias, no discharge.
-                        Back and Flank Exam: No CVA tenderness, no tenderness to the cervical, thoracic or lumbar spine.
-                        Musculoskeletal Exam: No clubbing, cyanosis or edema; normal range of motion without bony point tenderness
-                        Neurologic: Awake, alert, speech clear. CN 2-12 in tact, no gait or coordination problems. Expected sensation, bulk, tone, and strength in all extremities.
-                        Skin Exam: Warm and dry, no rashes
-                        Psychological: Normal mood and affect with intact attention and calculation.
-                        """},
-                        {"role": "user", "content": st.session_state.final_case}
-                    ]
-                    checklist_response = llm_call(model_choice, checklist_prompt)
-                    checklist_content = checklist_response['choices'][0]['message']['content']
-                    st.session_state.checklist = checklist_content
-                    st.success("Checklist Generated!")
-                    with st.expander("View Checklist", expanded=True):
-                        st.markdown(st.session_state.checklist)
-
-                    checklist_html = markdown2.markdown(st.session_state.checklist, extras=["tables"])
-                    pdf_path = html_to_pdf(checklist_html, 'checklist.pdf')
+                    checklist_html = markdown2.markdown(st.session_state.checklist_template, extras=["tables"])
+                    pdf_path = html_to_pdf(checklist_html, 'checklist_template.pdf')
                     with open(pdf_path, "rb") as f:
-                        st.download_button("Download Checklist PDF", f, "checklist.pdf")
-                
+                        st.download_button("Download Checklist Template PDF", f, "checklist_template.pdf")
+
                 if st.session_state.final_case !="":        
                     case_html = markdown2.markdown(st.session_state.final_case, extras=["tables"])
                         
@@ -461,13 +395,11 @@ if check_password():
                         else:
                             st.error("Saved Name is required to save the case")
     
-    # Initialize session state variables
     if "search_results" not in st.session_state:
         st.session_state.search_results = []
     if "selected_case" not in st.session_state:
         st.session_state.selected_case = None
 
-    # Tab2 content for retrieving and selecting cases
     with tab2:
         
         col3, col4 = st.columns([1,3])
@@ -475,8 +407,6 @@ if check_password():
             st.header("Retrieve Records")
             search_text = st.text_input("Search Text")
             search_saved_name = st.text_input("Search by Saved Name")
-            search_role =""
-            search_specialty = ""
 
             if st.button("Search Cases"):
                 st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name)
