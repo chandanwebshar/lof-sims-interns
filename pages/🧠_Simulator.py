@@ -80,6 +80,7 @@ def transcript_to_pdf(html_content, name):
     
     pdf.output(name, 'F')
 
+
 def html_to_pdf(html_content, name):
     try:
         soup = BeautifulSoup(html_content, "html.parser")
@@ -163,13 +164,22 @@ def extract_patient_door_chart_section(text):
     else:
         return "PATIENT DOOR CHART section not found in the provided text. Please go back to the Start page!"
 
+def infer_checklist_field(question):
+    prompt = f"Which field does the following question relate to?\n\nQuestion: {question}\n\nFields: {', '.join(CHECKLIST_FIELDS.keys())}\n\nAnswer with the most relevant field:, the response should only contain the relevant feild name"
+    response = llm_call("anthropic/claude-3-haiku", [{"role": "user", "content": prompt}])
+    inferred_field = response['choices'][0]['message']['content'].strip()
+    print(inferred_field)
+    if inferred_field in CHECKLIST_FIELDS:
+        return inferred_field
+    return None
+
 def update_checklist_with_answer(question, answer, checklist_fields):
-    for key in QUESTION_TO_FIELD_MAPPING.keys():
-        if key in question.lower():
-            field = QUESTION_TO_FIELD_MAPPING[key]
-            if not checklist_fields[field]:
-                checklist_fields[field] = answer
-            break
+    field = infer_checklist_field(question)
+    if field:
+        checklist_fields[field] = answer
+    else:
+        print("No Match detected")
+ 
 
 def generate_checklist_template(checklist_fields):
     template = "HPI:\n\n"
