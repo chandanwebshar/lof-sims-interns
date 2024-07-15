@@ -81,10 +81,59 @@ output_format = """
 - **SpO2**: `{{spo2}}`
 """
 
-sim_persona = """
+sim_persona = """### Create a Patient Persona for Case Study Simulation
+
+Given a comprehensive set of details from a clinical case file, craft a patient persona who aligns with the provided information in an 
+empathetic, realistic, and nuanced manner. This persona should be able to respond to simulated interactions based on the specifics of 
+their medical history, personal life, and more. 
+
+**Input Details:**
+
+- **Case Title**: (Input case title here)
+- **Paragraph Summary**: (Input summary)
+- **Patient Education Level, Emotional Response, Communication Style**: (Input details)
+- **History of Present Illness (HPI)**: (Onset, Location, Duration, Character, Aggravating/Alleviating Factors, etc.)
+- **Past Medical History (PMHx)**: (Active Problems, Surgical History, Immunizations, etc.)
+- **Social History (SHx)**: (Tobacco, Alcohol, Substances, Diet, Exercise, etc.)
+- **Family History (FHx)**: (Parents, Siblings health status)
+- **Medications and Allergies**: (Detailed list)
+- **Review of Systems (ROS)**: (Pertinent Findings)
+- **Physical Examination**: (Findings)
+- **Diagnostic Reasoning**: (Note Essential HPI Details User Should Elicit, Differential Diagnoses and Rationale)
+- **Teaching Points**: (Key Learning Objectives, Educational Content)
+- **Patient Door Chart (Learner Instructions)**: (Patient Name, Age, Legal Sex, Chief Complaint, Clinical Setting, Vital Signs)
+
+**Prompt:**
+
+Considering the in-depth information provided, create a fictional patient persona named **(Input patient's name here)**. This persona
+should be a vivid representation of the patient described in the case study, ready to interact with healthcare professionals in a 
+simulated environment. The persona must reflect the specifics of their medical and social history, personal attributes, and any other 
+pivotal information listed above. 
+
+For any potential history gaps not covered in the provided details, include responses that would naturally arise based on the existing 
+information, designed to deepen understanding and empathy towards the patient's situation.
+
+**Remember:** The goal is to foster a comprehensive understanding of the patient's life and health situation, aiding in better clinical 
+decision-making and compassionate care. Express emotion with pauses or expression of discomfort, e.g., Do not include stage instuctions, "with sadness".
+
+**Final note:** Do not volunteer important diagnostic clues; give gist and not details with open ended questions. The goal is for students to gain experience eliciting the key historical elements.
+"""
+
+learner_tasks = """### Learner Tasks
+
+1. **Obtain an appropriately focused and detailed history based upon the chief complaint.**
+2. **Perform a pertinent physical examination based upon the chief complaint.**
+3. **Discuss your diagnostic impressions and next steps with the patient.**
+4. **Place appropriate orders for the patient.**
+5. **Review results with the patient and further next steps.**
+6. **Answer any questions the patient may have to the best of your ability.**"""
+
+sim_persona_old = """
 ### Create a Patient Persona for Case Study Simulation
 
-Given a comprehensive set of details from a clinical case file, craft a patient persona who aligns with the provided information in an empathetic, realistic, and nuanced manner. This persona should be able to respond to simulated interactions based on the specifics of their medical history, personal life, and more. If any clarifications or additional details are needed that weren't included in the original case file, generate questions that seamlessly integrate with the existing case information.
+Given a comprehensive set of details from a clinical case file, craft a patient persona who aligns with the provided information in an empathetic, realistic, and nuanced manner. 
+This persona should be able to respond to simulated interactions based on the specifics of their medical history, personal life, and more. If any clarifications or additional details are needed 
+that weren't included in the original case file, generate questions that seamlessly integrate with the existing case information.
 
 **Input Details:**
 
@@ -112,7 +161,70 @@ For any potential gaps not covered in the provided details, include questions th
 **Final note:** Express emotion with pauses or expression of discomfort, e.g., Do not include stage instuctions, "with sadness".
 ```"""
 
-orders_prompt = """### Generate Results for a Patient Simulation Case with Specific Orders and Case Details
+orders_prompt = """### Generate Results for a Patient Simulation Case for New Orders
+
+**Task:** Leverage the new orders/actions provided, and the comprehensive patient case information, to generate accurate and consistent results 
+for a simulated patient case. Do not comment on results or orders. Your job is to interpret the order silently and provide results that match the case.
+If the orders/actions are ambiguous, make a best guess. If wrong, the user will enter another order. Again, just results, no commentary.
+
+Thus, the focus is on returning precise results for just the most recent time stamped *new* orders/actions that align with evolving case details, 
+without including extraneous commentary. (You'll see prior orders in the prior results section for context.)
+
+**Input Details:**
+
+- **New Orders/Actions**: {order_details}
+- **New Orders Date and Time**: {order_datetime}
+- **Case Scenario**: {case_details}
+- **Prior Results**: {prior_results}
+
+**Prompt:**
+
+Given the specified orders, alongside the patient context, create a set of results **only for the new specific orders/actions** that:
+- Are tailored to the provided patient case, reflecting an understanding of their condition and history.
+- Include clear outcomes for each lab test ordered, presented in a markdown table with date and time set to 10 minutes after the order date and time.
+- If medications were ordered, include a note on their administration status and any resultant reactions, maintaining consistency with the patient's detailed case. If no medications were ordered, exclude the medication administration section.
+- If explicitly requested, provide findings for physical examination (e.g. lung exam) or vitals. Carefully craft the updated findings as expected using the patient’s evolving case.
+- If the action requested is unsafe for the patient, state the nurse is refusing to carry out the order on your behalf given patient safety concerns.
+
+
+**Guidelines:**
+
+- Ensure the results directly tie back to and are consistent with the patient scenario described.
+- Use the prior results from earlier orders for context to enhance the accuracy of the evolving case with the new results. 
+- Keep the response focused exclusively on providing the requested results for the new orders/actions. Avoid unrelated details or commentary, e.g., "no new medications" or "simulation".
+- Aim to enhance the realism of the simulation for students, fostering a deeper understanding of patient care and clinical decision-making processes.
+- Make your best match possible for any abbreviations used in Orders/Actions. For example, CMP is comprehensive metabolic panel, BMP is basic metabolic panel, and cbc is complete blood count. Generate all corresponding lab results in the same table. 
+
+**Generate results without commentary about efforts matching the case details.**
+
+**Example User Input:**
+- **Specific Orders**: Complete blood count (CBC), chest X-ray, administer 500 mg Acetaminophen
+- **Order Date and Time**: 2024-05-24 10:30 AM
+- **Case Scenario**: A 45-year-old male patient presenting with fever, cough, and shortness of breath.
+- **Prior Results**:
+
+
+**Sample Generated Output:**
+
+**Lab Results:**
+| Test                | Result      | Reference Range      | Date and Time          |
+|---------------------|-------------|----------------------|------------------------|
+| WBC                 | 12.5 x10^3/uL| 4.0-11.0 x10^3/uL    | 2024-05-24 10:40 AM    |
+| Hemoglobin          | 14.0 g/dL   | 13.5-17.5 g/dL       | 2024-05-24 10:40 AM    |
+| Platelet Count      | 200 x10^3/uL| 150-450 x10^3/uL     | 2024-05-24 10:40 AM    |
+
+**Chest X-ray Findings:**
+- Mild bilateral infiltrates suggestive of pneumonia.
+
+**Medication Administration:**
+- 500 mg Acetaminophen administered at 10:45 AM. No adverse reactions noted.
+
+**Physical Exam Findings:**
+- Lung Examination: Bilateral crackles heard in the lower lobes.
+
+"""
+
+orders_promp_old = """### Generate Results for a Patient Simulation Case with Specific Orders and Case Details
 
 **Task:** Leverage the specific orders provided, and the comprehensive patient case information, to generate accurate and consistent results for a simulated patient case. If medications are part of the orders, confirm their administration and note any reactions. The focus is on returning precise results aligned with the case details, without including extraneous commentary.
 
@@ -144,14 +256,64 @@ Sample Generated Output:
 D-DIMER: 140.00, REF: D-DIMER: < 240.00 ng/mL DDU
 """
 
-assessment_prompt = """**Title:** Grading and Assessment of Simulated Patient Interaction by Medical Student Level
+assessment_prompt = """### Grading and Assessment of Interaction with a Simulated Patient
 
-*Instructions:*
+**Instructions:**
 
-Given the inputs of a student's level (e.g., first-year medical student) and detailed case information about a simulated patient, please analyze a transcript of the student's interaction with the patient, including the decisions regarding specific orders that were placed. Utilize the following rubric to grade and assess the interaction:
+Given the following inputs, assess the quality of the student's interactions with the simulated patient:
 
 **Input Details:**
 
+- **Learner Tasks**: {learner_tasks}
+- **Student Levels**: {student_level} 
+- **Case Scenario**: {case_details} 
+- **Conversation Transcript**: {conversation_transcript} 
+- **Orders Placed**: {orders_placed} 
+- **Results**: {results}
+
+**Rubric:**
+
+1. **History Taking:**
+   - **Criteria:** Ability to obtain a focused and detailed history based on the chief complaint, appropriate sequence and relevance of questions, adaptation based on patient responses.
+   - **Scoring:** Rate on a scale of 1-5, considering the thoroughness and relevance of the history obtained.
+
+2. **Physical Examination:**
+   - **Criteria:** Execution of a pertinent physical examination based on the chief complaint, proper technique, and systematic approach.
+   - **Scoring:** Rate on a scale of 1-5, where 1 is inadequate and 5 demonstrates a thorough and systematic approach.
+
+3. **Diagnostic Impression and Communication:**
+   - **Criteria:** Discussion of diagnostic impressions and next steps with the patient, clarity and accuracy of communication, ability to maintain patient understanding and comfort.
+   - **Scoring:** Rate on a scale of 1-5, focusing on the clarity and effectiveness of communication regarding diagnosis and next steps.
+
+4. **Clinical Orders:**
+   - **Criteria:** Relevance and timeliness of orders placed in response to the patient’s condition, diagnostic reasoning, and judgment.
+   - **Scoring:** Rate on a scale of 1-5, where 1 signifies poor judgment and 5 exemplary decision-making.
+
+5. **Reviewing Results and Next Steps:**
+   - **Criteria:** Ability to review and explain results with the patient, discuss further steps, and answer patient questions effectively.
+   - **Scoring:** Rate on a scale of 1-5, focusing on clarity, patient comprehension, and thoroughness in addressing patient concerns.
+
+6. **Empathy and Patient Interaction:**
+   - **Criteria:** Presence of empathetic phrases, appropriate tone, active listening indicators, overall patient interaction quality.
+   - **Scoring:** Rate on a scale of 1-5, where 1 is lacking and 5 is exceptional in demonstrating empathy and patient-centered communication.
+
+*Final Assessment:*
+
+- Provide a summary of the strengths observed during the interaction.
+- Offer constructive feedback on areas for improvement.
+- Suggest specific actions or learning resources for enhancing skills in identified weak areas.
+
+**Please proceed to grade and assess the student's performance based on the provided rubric and inputs.**"""
+
+assessment_prompt_old = """**Title:** Grading and Assessment of Interaction with a Simulated Patient
+
+*Instructions:*
+
+Given the following inputs, assess the quality of the student's interactions with the simulated patient:
+
+**Input Details:**
+
+- **Learner Tasks**: {learner_tasks}
 - **Student Levels**: {student_level} 
 - **Case Scenario**: {case_details} 
 - **Conversation Transcript**: {conversation_transcript} 
@@ -165,8 +327,8 @@ Given the inputs of a student's level (e.g., first-year medical student) and det
    - **Scoring:** Rate on a scale of 1-5, where 1 is lacking and 5 is exceptional.
 
 2. **Questioning Technique:**
-   - **Criteria:** Sequence and relevance of questions asked, adaptation based on patient's responses. Ability to elicit essential HPI details for the case.
-   - **Scoring:** Rate on a scale of 1-5, considering both the appropriateness and adaptiveness of questioning and whether essential details were obtained.
+   - **Criteria:** Sequence and relevance of questions asked, adaptation based on patient's responses. Ability to elicit all essential HPI details for the case.
+   - **Scoring:** Rate on a scale of 1-5, considering both the appropriateness and adaptiveness of questioning and whether all essential details were obtained.
 
 3. **Clinical Orders:**
    - **Criteria:** Diagnostic reasoning, relevance and timeliness of orders placed in response to the patient’s condition.
@@ -182,7 +344,40 @@ Given the inputs of a student's level (e.g., first-year medical student) and det
 - Offer constructive feedback on areas for improvement.
 - Suggest specific actions or learning resources for enhancing skills in identified weak areas.
 
-**Please proceed to grade and assess the student's performance based on the provided rubric and transcript.**
+**Please proceed to grade and assess the student's performance based on the provided rubric and inputs.**
+"""
+
+
+h_and_p_prompt = """Please generate a comprehensive History and Physical (H&P) document up to the Assessment and Plan section based on the provided information. The document should include the following sections:
+
+1. Chief Complaint (CC)
+2. History of Present Illness (HPI)
+3. Past Medical History (PMH)
+4. Past Surgical History (PSH)
+5. Family History (FH)
+6. Social History (SH)
+7. Home Medications
+8. Allergies
+9. Review of Systems (ROS)
+10. Physical Exam (PE)
+11. Laboratory and Imaging Results
+12. Assessment and Plan
+
+The Assessment and Plan section should be present but left blank.
+
+**User Input:**
+
+- **Door Chart, Transcript of Student Interview, Orders and Results Results:** {conversation_transcript}
+
+**Contextual Instructions:**
+
+- Ensure each section is clearly labeled and information is appropriately categorized.
+- Populate the physical exam section with findings identified.
+- Populate the Laboratory and Imaging Results section with summarized findings and explicit notable findings. 
+- Use medical terminology accurately.
+- Maintain a professional and clinical tone.
+- If no information was elicited, please state "N/A".
+- Do not fill in the Assessment and Plan section; it should remain blank for further completion.
 """
 
 output_format_json = """{
