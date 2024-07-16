@@ -5,10 +5,8 @@ import requests
 from sim_prompts import *  # Ensure this import provides the needed functionality
 from bs4 import BeautifulSoup
 from fpdf import FPDF
-from docx import Document
 from sqlalchemy import create_engine, Column, Integer, String, Text, MetaData, Index
 from sqlalchemy.orm import sessionmaker, declarative_base
-import pandas as pd
 
 # Database setup
 DATABASE_URL = "sqlite:///app_data.db"  # SQLite database
@@ -43,20 +41,6 @@ class CaseDetails(Base):
     role = Column(String, nullable=False)
     specialty = Column(String, nullable=True)
     __table_args__ = (Index('case_details_content_idx', 'content'),)
-
-class LabResults(Base):
-    __tablename__ = 'lab_results'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    saved_name = Column(String, nullable=False)
-    content = Column(Text, nullable=False)
-    __table_args__ = (Index('lab_results_content_idx', 'content'),)
-
-# Drop existing lab_results table if it exists
-meta = MetaData()
-meta.reflect(bind=engine)
-if 'lab_results' in meta.tables:
-    lab_results_table = meta.tables['lab_results']
-    lab_results_table.drop(engine)
 
 # Create tables
 Base.metadata.create_all(engine)
@@ -138,41 +122,9 @@ def html_to_pdf(html_content, name):
             pdf.add_page()
     
     # Output the PDF
-    pdf.output(name)
-
-def html_to_docx(html_content, name):
-    # Use BeautifulSoup to parse the HTML
-    soup = BeautifulSoup(html_content, "html.parser")
-    
-    # Create DOCX instance
-    doc = Document()
-
-    # Extract title for the document
-    case_title_tag = soup.find("h1")
-    case_title = case_title_tag.get_text() if case_title_tag else "Document"
-    doc.add_heading(case_title, level=1)
-    
-    # Process each section of the HTML
-    for element in soup.find_all(["h1", "h2", "h3", "p", "ul", "ol", "li", "hr"]):
-        if element.name == "h1":
-            doc.add_heading(element.get_text(), level=1)
-        elif element.name == "h2":
-            doc.add_heading(element.get_text(), level=2)
-        elif element.name == "h3":
-            doc.add_heading(element.get_text(), level=3)
-        elif element.name == "p":
-            doc.add_paragraph(element.get_text())
-        elif element.name == "ul":
-            for li in element.find_all("li"):
-                doc.add_paragraph(f"- {li.get_text()}")
-        elif element.name == "ol":
-            for i, li in enumerate(element.find_all("li"), start=1):
-                doc.add_paragraph(f"{i}. {li.get_text()}")
-        elif element.name == "hr":
-            doc.add_page_break()
-    
-    # Output the DOCX
-    doc.save(name)
+    pdf_path = f"/tmp/{name}"
+    pdf.output(pdf_path)
+    return pdf_path
 
 def init_session():
     if "final_case" not in st.session_state:
@@ -183,16 +135,10 @@ def init_session():
         st.session_state["retrieved_name"] = ""
     if "selected_case_id" not in st.session_state:
         st.session_state["selected_case_id"] = -1
-    if "lab_tests" not in st.session_state:
-        st.session_state["lab_tests"] = {}
-    if "selected_tests" not in st.session_state:
-        st.session_state["selected_tests"] = {}
-    if "lab_results" not in st.session_state:
-        st.session_state["lab_results"] = ""
-    if "selected_lab_result" not in st.session_state:
-        st.session_state["selected_lab_result"] = None
-    if "search_results" not in st.session_state:
-        st.session_state["search_results"] = []
+    if "checklist_template" not in st.session_state:
+        st.session_state["checklist_template"] = generate_checklist_template()
+    if "chat_history" not in st.session_state:
+        st.session_state["chat_history"] = []
 
 # Function to save a transcript
 def save_transcript(transcript_content, role, specialty):
@@ -212,18 +158,8 @@ def save_case_details(case_details_content, saved_name, role = "", specialty="")
     session.add(new_case_details)
     session.commit()
 
-# Function to save lab results
-def save_lab_results(lab_results_content, saved_name):
-    new_lab_results = LabResults(content=lab_results_content, saved_name=saved_name)
-    session.add(new_lab_results)
-    session.commit()
-
-    # Debugging output
-    saved_result = session.query(LabResults).filter_by(saved_name=saved_name).first()
-    st.write(f"Debug: Saved Lab Result - {saved_result.saved_name}: {saved_result.content}")
-
 # Function to retrieve records with full-text search and wildcards
-def get_records(model, search_text=None, saved_name=None):
+def get_records(model, search_text=None, saved_name=None, role=None, specialty=None):
     query = session.query(model)
     if search_text:
         search_text = f"%{search_text}%"  # Wildcard search
@@ -231,17 +167,20 @@ def get_records(model, search_text=None, saved_name=None):
     if saved_name:
         saved_name = f"%{saved_name}%"  # Wildcard search
         query = query.filter(model.saved_name.ilike(saved_name))
+    if role:
+        query = query.filter_by(role=role)
+    if specialty:
+        query = query.filter_by(specialty=specialty)
     return query.all()
 
 def llm_call(model, messages):
-    
     try:
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
-                "Authorization": "Bearer " + st.secrets["OPENROUTER_API_KEY"],  # Fixed to correct access to secrets
+                "Authorization": "Bearer " + st.secrets["OPENROUTER_API_KEY"],
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://fsm-gpt-med-ed.streamlit.app",  # To identify your app
+                "HTTP-Referer": "https://fsm-gpt-med-ed.streamlit.app",
                 "X-Title": "lof-sims",
             },
             data=json.dumps({
@@ -252,13 +191,12 @@ def llm_call(model, messages):
     except requests.exceptions.RequestException as e:
         st.error(f"Error - make sure bills are paid!: {e}")
         return None
-    # Extract the response content
     try:
         response_data = response.json()
     except json.JSONDecodeError:
         st.error(f"Error decoding JSON response: {response.content}")
         return None
-    return response_data  # Adjusted to match expected JSON structure
+    return response_data
 
 def check_password():
     """Returns `True` if the user had the correct password."""
@@ -272,118 +210,66 @@ def check_password():
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
-        # First run, show input for password.
         st.text_input(
             "Password", type="password", on_change=password_entered, key="password"
         )
         st.write("*Please contact David Liebovitz, MD if you need an updated password for access.*")
         return False
     elif not st.session_state["password_correct"]:
-        # Password not correct, show input + error.
         st.text_input(
             "Password", type="password", on_change=password_entered, key="password"
         )
         st.error("😕 Password incorrect")
         return False
     else:
-        # Password correct.
         return True
+
+def generate_checklist_template():
+    checklist_template = """
+    HPI:
+    
+    Onset: 
+    
+    Location: 
+    
+    Duration: 
+    
+    Character:
+    
+    Aggravating/ Alleviating factors: 
+    
+    Radiation: 
+    
+    Timing:
+    
+    Severity:
+    """
+    return checklist_template
+
+def update_checklist_with_answers(user_question, checklist_template):
+    answer_prompt = [
+        {
+            "role": "system",
+            "content": """
+            Based on the case details and the user's question, provide specific answers to populate the checklist. Ensure the answers are detailed and accurate.
+            """
+        },
+        {
+            "role": "user",
+            "content": f"Case details: {st.session_state.final_case}"
+        },
+        {
+            "role": "user",
+            "content": f"User question: {user_question}"
+        }
+    ]
+    answer_response = llm_call(model_choice, answer_prompt)
+    answer_content = answer_response['choices'][0]['message']['content']
+    updated_checklist = checklist_template + "\n\n" + answer_content
+    return updated_checklist
 
 st.title("Case Generator for Simulations")
 init_session()
-
-# Changes made by Tanaya
-lab_tests_dict = {
-    "Thyroid": {
-        "TSH": "0.3-3.7 uIU/ml",
-        "Free T3": "230-619 pg/dL",
-        "Free T4": "0.7-1.9 ng/dL"
-    },
-    "Cardiac": {
-        "CPK": "26-140 U/L",
-        "CK-MB": "< 3% of total",
-        "Troponin I": "0.00-0.04 ng/ml"
-    },
-    "CMP": {  # Abbreviation used here
-        "Sodium": "135-145 mmol/L",
-        "Potassium": "3.5-4.5 mmol/L",
-        "Chloride": "98 - 106 mmol/L",
-        "CO2": "22-29 mmol/L",
-        "BUN": "7 - 18 mg/dL",
-        "Cr": "0.6-1.2 mg/dL",
-        "Glucose": "20-115 mg/dL",
-        "Calcium": "8.4-10.2 mg/dL",
-        "Magnesium": "1.3-2.1 mmol/L",
-        "Alk Phos": "38-126 U/L",
-        "Albumin": "3.5-5.5 g/dL",
-        "Total Protein": "6 - 8 g/dL",
-        "AST": "5 - 30 U/L",
-        "ALT": "5 - 35 U/L",
-        "Bilirubin": "< 1.0 mg/dL"
-    },
-    "CBC": {  # Abbreviation used here
-        "WBC": "4,000 - 10,000 / mm3",
-        "RBC": "4.6-6.2/microliter",
-        "HGB": "13-16 g/dL",
-        "HCT": "40-50%",
-        "MCV": "80-100 fl",
-        "MCH": "28-32 pg",
-        "MCHC": "32-36 g/dL",
-        "RDW": "11 - 14%",
-        "Platelets": "140,000-150,000/mm3",
-        "Neutrophils": "40 - 60%",
-        "Lymphocytes": "20 - 40%",
-        "Monocytes": "2 - 8%",
-        "Eosinophils": "1 - 4%",
-        "Basophils": "0.5% - 1%",
-        "Band forms": "0 - 10%"
-    },
-    "UA": {  # Abbreviation used here
-        "pH": "5 - 9",
-        "Specific Gravity": "1.010 - 1.060",
-        "Color": "Light yellow / colorless",
-        "Turbidity": "Clear",
-        "Protein": "NEG",
-        "Glucose": "NEG",
-        "Ketones": "NEG",
-        "Bili": "NEG",
-        "Blood": "NEG",
-        "Leukocyte Esterase": "NEG",
-        "Nitrite": "NEG",
-        "WBC": "No Cells",
-        "RBC": "No Cells",
-        "Crystals": "None"
-    },
-    "ABG": {  # Abbreviation used here
-        "pH": "7.34-7.44",
-        "pCO2": "35-45 mmHg",
-        "pO2": "75-100 mmHg",
-        "HCO3": "22-26 mmol/L",
-        "O2 Sat.": "95%-100%"
-    },
-    "Cholesterol": {
-        "Total Cholesterol": "low risk <200, mod:200-239, high >239 mg/dL",
-        "HDL": "at risk <40, optimal >59 mg/dL",
-        "LDL": "low risk <130, mod:130-159, high >159 units/dL",
-        "Triglycerides": "35-135(♀), 40-160(♂) mg/dL",
-        "Chol/HDL Ratio": "1-3.5",
-        "non-HDL Cholesterol": "<130 mg/dL"
-    },
-    "Coagulation": {  # Abbreviation used here
-        "PT": "11-15 s",
-        "aPTT": "20-35 s",
-        "INR": "1",
-        "D dimer": "<0.50 mcg/mL"
-    },
-    "Iron": {  # Abbreviation used here
-        "serum iron": "37-145 (♀) 59-158 (♂) mcg/dL",
-        "TIBC": "250-425 mcg/dL",
-        "transferrin sat": "15-50% (♀) 20-50% (♂)",
-        "ferritin": "12-150 (♀) 12-300 (♂) ng/mL"
-    },
-    
-}
-# Changes made by Tanaya - End
 
 if check_password():
     st.info("Provide inputs and generate a case. After your case is generated, please click the '*Send case to the simulator!*' and then wake the simulator.")
@@ -410,7 +296,7 @@ if check_password():
     if "learner_tasks" not in st.session_state:
         st.session_state["learner_tasks"] = learner_tasks
         
-    tab1, tab2, tab3 = st.tabs(["New Case", "Retrieve a Case", "Lab Tests"])
+    tab1, tab2 = st.tabs(["New Case", "Retrieve a Case"])
     
     with tab1:
 
@@ -426,7 +312,7 @@ if check_password():
             }
             case_study_input = json.dumps(case_study_input)
             with st.expander("Default Learner Tasks", expanded = False):
-                st.markdown(learner_tasks)  # Display the default tasks
+                st.markdown(learner_tasks)
             if st.checkbox("Edit Learner Tasks", value=False, key = "initial_case_edit"):
                 learner_tasks = st.text_area("Learner Tasks for Assessment", height=200, help = "What the learner is expected to do, e.g., Perform a focused history and examination", value = learner_tasks)
             st.session_state.learner_tasks = learner_tasks
@@ -468,18 +354,25 @@ if check_password():
                         st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator (including any saved edits)", icon="🧠")
                 else:
                     st.session_state["final_case"] = st.session_state.response_markdown
-                
+
+                if st.button("Generate Checklist for Students"):
+                    st.session_state.checklist_template = generate_checklist_template()
+                    st.success("Checklist Template Generated!")
+                    with st.expander("View Checklist Template", expanded=True):
+                        st.markdown(st.session_state.checklist_template)
+
+                    checklist_html = markdown2.markdown(st.session_state.checklist_template, extras=["tables"])
+                    pdf_path = html_to_pdf(checklist_html, 'checklist_template.pdf')
+                    with open(pdf_path, "rb") as f:
+                        st.download_button("Download Checklist Template PDF", f, "checklist_template.pdf")
+
                 if st.session_state.final_case !="":        
                     case_html = markdown2.markdown(st.session_state.final_case, extras=["tables"])
                         
                     if st.checkbox("Generate Case PDF file"):
-                        html_to_pdf(case_html, 'case.pdf')
-                        with open("case.pdf", "rb") as f:
+                        pdf_path = html_to_pdf(case_html, 'case.pdf')
+                        with open(pdf_path, "rb") as f:
                             st.download_button("Download Case PDF", f, "case.pdf")
-                    if st.checkbox("Generate Case DOCX file"):
-                        html_to_docx(case_html, 'case.docx')
-                        with open("case.docx", "rb") as f:
-                            st.download_button("Download Case DOCX", f, "case.docx")
 
                 if st.session_state["final_case"] != "":
                     if st.button("Send case to the simulator!"):
@@ -507,7 +400,6 @@ if check_password():
     if "selected_case" not in st.session_state:
         st.session_state.selected_case = None
 
-    # Tab2 content for retrieving and selecting cases
     with tab2:
         
         col3, col4 = st.columns([1,3])
@@ -515,19 +407,15 @@ if check_password():
             st.header("Retrieve Records")
             search_text = st.text_input("Search Text")
             search_saved_name = st.text_input("Search by Saved Name")
-            search_role =""
-            search_specialty = ""
-            if search_role in ["Resident", "Fellow", "Attending"]:
-                search_specialty = st.text_input("Search by Specialty", "")
 
             if st.button("Search Cases"):
                 st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name)
 
             if st.session_state.search_results:
                 st.subheader("Cases Found")
-                for i, case in enumerate(st.session_state.search_results, start=1):
-                    st.write(f"{i}. {case.saved_name}")
-                    if st.button(f"View (and Select) Case {i}", key=f"select_case_{i}"):
+                for i, case in enumerate(st.session_state.search_results):
+                    st.write(f"{i+1}. {case.saved_name}")
+                    if st.button(f"View (and Select) Case {i+1}", key=f"select_case_{i}"):
                         st.session_state.selected_case = case
             with col4:
                 if st.session_state.selected_case:
@@ -547,85 +435,13 @@ if check_password():
                             st.session_state.final_case = updated_retrieved_case
                             st.info("Case Edits Saved!")   
                             updated_case_html = markdown2.markdown(st.session_state.final_case, extras=["tables"])
-                            html_to_pdf(updated_case_html, 'updated_case.pdf')
-                            with open("updated_case.pdf", "rb") as f:
+                            pdf_path = html_to_pdf(updated_case_html, 'updated_case.pdf')
+                            with open(pdf_path, "rb") as f:
                                 st.download_button("Download Updated Case PDF", f, "updated_case.pdf")
-                            if st.button("Generate Case DOCX file"):
-                                html_to_docx(updated_case_html, 'updated_case.docx')
-                                with open("updated_case.docx", "rb") as f:
-                                    st.download_button("Download Case DOCX", f, "updated_case.docx")
                             if make_new_entry:
                                 if saved_name:
                                     save_case_details(st.session_state.final_case, saved_name)
                                     st.success("Case Details saved successfully!")
                                 else:
-                                    st.error("Saved Name is required to save the case")
+                                    st.error("Saved Name is required to save the case")     
                     st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator ", icon="🧠")
-
-# Changes made by Tanaya
-    # Tab3
-    with tab3:
-        st.header("Generate Lab Test Results")
-
-        primary_diagnosis = st.text_input("Primary Diagnosis")
-
-        col1, col2 = st.columns([1, 1])
-        
-        with col1:
-            selected_diagnoses = st.multiselect("Select Panel for Lab Tests", options=list(lab_tests_dict.keys()))
-            if selected_diagnoses:
-                st.session_state.lab_tests = {diagnosis: lab_tests_dict[diagnosis] for diagnosis in selected_diagnoses}
-                st.session_state.selected_tests = {diagnosis: list(lab_tests_dict[diagnosis].keys()) for diagnosis in selected_diagnoses}
-
-                selected_tests_data = []
-                for diagnosis, tests in st.session_state.lab_tests.items():
-                    for test, normal_range in tests.items():
-                        selected_tests_data.append([diagnosis, test, normal_range])
-
-                df = pd.DataFrame(selected_tests_data, columns=["Panel", "Test", "Normal Range"])
-                df["Select"] = True  # Default to all selected
-                edited_df = st.data_editor(df, use_container_width=True, height=200)  # Adjust height
-
-                edited_rows = st.session_state.get('data_editor', {}).get('edited_rows', {})
-                for row_index, changes in edited_rows.items():
-                    diagnosis = df.at[row_index, 'Panel']
-                    test = df.at[row_index, 'Test']
-                    if not changes['Select']:
-                        st.session_state.selected_tests[diagnosis].remove(test)
-
-        with col2:
-            prompt = st.text_area("Specify details for LLM to generate lab results with normality or abnormality", height=232, key="global_prompt")  # Adjust height
-
-        col_full = st.columns([1])
-        with col_full[0]:
-            if st.button("Generate Lab Test Results"):
-                if primary_diagnosis:
-                    all_lab_results = ""
-                    for diagnosis in selected_diagnoses:
-                        selected_tests = st.session_state.selected_tests.get(diagnosis, [])
-                        if selected_tests:
-                            messages = [
-                                {"role": "system", "content": "You are an AI that generates realistic lab test results based on the provided primary diagnosis and selected tests."},
-                                {"role": "user", "content": f"Primary Diagnosis: {primary_diagnosis}\nSelected Tests: {json.dumps(selected_tests)}\nDetails: {prompt}"}
-                            ]
-                            with st.spinner(f"Generating lab test results for {diagnosis}..."):
-                                response_content = llm_call(model_choice, messages)
-                            if response_content:
-                                lab_results = response_content['choices'][0]['message']['content']
-                                all_lab_results += f"### Lab Results for {diagnosis}\n{lab_results}\n\n"
-                            else:
-                                st.error(f"Failed to generate lab test results for {diagnosis}.")
-                    
-                    st.session_state.lab_results = all_lab_results
-                    with st.expander("Lab Results", expanded=True):
-                        st.markdown(st.session_state.lab_results, unsafe_allow_html=True)
-                    lab_results_html = markdown2.markdown(st.session_state.lab_results, extras=["tables"])
-                    
-                    # Download buttons for PDF and DOCX
-                    html_to_pdf(lab_results_html, 'lab_results.pdf')
-                    with open("lab_results.pdf", "rb") as f:
-                        st.download_button("Download Lab Results PDF", f, "lab_results.pdf")
-                    
-                    html_to_docx(lab_results_html, 'lab_results.docx')
-                    with open("lab_results.docx", "rb") as f:
-                        st.download_button("Download Lab Results DOCX", f, "lab_results.docx")
