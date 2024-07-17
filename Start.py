@@ -223,7 +223,7 @@ def save_lab_results(lab_results_content, saved_name):
     st.write(f"Debug: Saved Lab Result - {saved_result.saved_name}: {saved_result.content}")
 
 # Function to retrieve records with full-text search and wildcards
-def get_records(model, search_text=None, saved_name=None):
+def get_records(model, search_text=None, saved_name=None, student_name=None, role=None, specialty=None):
     query = session.query(model)
     if search_text:
         search_text = f"%{search_text}%"  # Wildcard search
@@ -231,6 +231,13 @@ def get_records(model, search_text=None, saved_name=None):
     if saved_name:
         saved_name = f"%{saved_name}%"  # Wildcard search
         query = query.filter(model.saved_name.ilike(saved_name))
+    if student_name:
+        student_name = f"%{student_name}%"  # Wildcard search
+        query = query.filter(model.content.ilike(student_name))
+    if role:
+        query = query.filter_by(role=role)
+    if specialty:
+        query = query.filter_by(specialty=specialty)
     return query.all()
 
 def llm_call(model, messages):
@@ -420,6 +427,7 @@ if check_password():
             st.info("**Include desired history in the text paragraph. The AI will generate additional details as needed to draft an educational case.**")
                 
             case_study_input = {
+                'Name': st.text_input("Student Name", help="Enter your name here"),
                 'Case Title': st.text_input("Case Study Title", help="Presenting symptom, e.g."),
                 'Case Description': st.text_area("Case Description", height=200, help = "As detailed or brief as desired, e.g., 65F with acute chest pain..."),
                 'Case Primary Diagnosis': st.text_input("Primary Diagnosis", help = "The one or more primary diagnoses, e.g., Pulmonary Embolism"),
@@ -515,14 +523,14 @@ if check_password():
             st.header("Retrieve Records")
             search_text = st.text_input("Search Text")
             search_saved_name = st.text_input("Search by Saved Name")
+            search_student_name = st.text_input("Search by Student Name")
             search_role =""
             search_specialty = ""
             if search_role in ["Resident", "Fellow", "Attending"]:
                 search_specialty = st.text_input("Search by Specialty", "")
 
             if st.button("Search Cases"):
-                st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name)
-
+                st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name,search_student_name)
             if st.session_state.search_results:
                 st.subheader("Cases Found")
                 for i, case in enumerate(st.session_state.search_results, start=1):
