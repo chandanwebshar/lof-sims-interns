@@ -4,9 +4,12 @@ import json
 import requests
 from sim_prompts import *  # Ensure this import provides the needed functionality
 from bs4 import BeautifulSoup
-from fpdf import FPDF
+#from fpdf import FPDF
 from sqlalchemy import create_engine, Column, Integer, String, Text, MetaData, Index
+# from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, declarative_base
+# from st_pages import show_pages, hide_pages, Page
+#from Start import llm_call
 
 # Database setup
 DATABASE_URL = "sqlite:///app_data.db"  # SQLite database
@@ -14,6 +17,7 @@ DATABASE_URL = "sqlite:///app_data.db"  # SQLite database
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 session = Session()
+# Base = declarative_base()
 Base = declarative_base()
 
 # Define the models
@@ -54,40 +58,9 @@ st.set_page_config(
 with st.sidebar:
     st.image("static/er_bays.jpeg", use_column_width=True)
 
-class PDF(FPDF):
-    def header(self):
-        self.set_font("Arial", "B", 12)
-        self.cell(0, 10, self.title, 0, 1, "C")
-        self.ln(10)
 
-    def chapter_title(self, title, level=1):
-        if level == 1:
-            self.set_font("Arial", "B", 16)
-            self.ln(10)
-        elif level == 2:
-            self.set_font("Arial", "B", 14)
-            self.ln(8)
-        elif level == 3:
-            self.set_font("Arial", "B", 12)
-            self.ln(6)
-        self.cell(0, 10, title, 0, 1, "L")
-        self.ln(2)
 
-    def chapter_body(self, body):
-        self.set_font("Arial", "", 12)
-        self.multi_cell(0, 10, body)
-        self.ln()
-
-    def add_list(self, items, is_ordered=False):
-        self.set_font("Arial", "", 12)
-        for i, item in enumerate(items, start=1):
-            if is_ordered:
-                self.multi_cell(0, 10, f"{i}. {item}")
-            else:
-                self.multi_cell(0, 10, f"- {item}")
-        self.ln()
-
-def html_to_pdf(html_content, name):
+def html_to_doc(html_content, name):
     # Use BeautifulSoup to parse the HTML
     soup = BeautifulSoup(html_content, "html.parser")
     
@@ -96,35 +69,33 @@ def html_to_pdf(html_content, name):
     case_title = case_title_tag.get_text() if case_title_tag else "Document"
     
     # Create PDF instance with dynamic title
-    pdf = PDF()
-    pdf.title = case_title
-    pdf.add_page()
+    doc = Document()
+    doc.title = case_title
+    doc.add_page()
 
     # Process each section of the HTML
     for element in soup.find_all(["h1", "h2", "h3", "p", "ul", "ol", "li", "hr"]):
         if element.name == "h1":
-            pdf.chapter_title(element.get_text(), level=1)
+            doc.chapter_title(element.get_text(), level=1)
         elif element.name == "h2":
             if "Patient Door Chart" in element.get_text():
-                pdf.add_page()
-            pdf.chapter_title(element.get_text(), level=2)
+                doc.add_page()
+            doc.chapter_title(element.get_text(), level=2)
         elif element.name == "h3":
-            pdf.chapter_title(element.get_text(), level=3)
+            doc.chapter_title(element.get_text(), level=3)
         elif element.name == "p":
-            pdf.chapter_body(element.get_text())
+            doc.chapter_body(element.get_text())
         elif element.name == "ul":
             items = [li.get_text() for li in element.find_all("li")]
-            pdf.add_list(items, is_ordered=False)
+            doc.add_list(items, is_ordered=False)
         elif element.name == "ol":
             items = [li.get_text() for li in element.find_all("li")]
-            pdf.add_list(items, is_ordered=True)
+            doc.add_list(items, is_ordered=True)
         elif element.name == "hr":
-            pdf.add_page()
+            doc.add_page()
     
     # Output the PDF
-    pdf_path = f"/tmp/{name}"
-    pdf.output(pdf_path)
-    return pdf_path
+    doc.output(name)
 
 def init_session():
     if "final_case" not in st.session_state:
@@ -135,10 +106,7 @@ def init_session():
         st.session_state["retrieved_name"] = ""
     if "selected_case_id" not in st.session_state:
         st.session_state["selected_case_id"] = -1
-    if "checklist_template" not in st.session_state:
-        st.session_state["checklist_template"] = generate_checklist_template()
-    if "chat_history" not in st.session_state:
-        st.session_state["chat_history"] = []
+    
 
 # Function to save a transcript
 def save_transcript(transcript_content, role, specialty):
@@ -159,7 +127,7 @@ def save_case_details(case_details_content, saved_name, role = "", specialty="")
     session.commit()
 
 # Function to retrieve records with full-text search and wildcards
-def get_records(model, search_text=None, saved_name=None, role=None, specialty=None):
+def get_records(model, search_text=None, saved_name=None, student_name=None, role=None, specialty=None):
     query = session.query(model)
     if search_text:
         search_text = f"%{search_text}%"  # Wildcard search
@@ -167,6 +135,9 @@ def get_records(model, search_text=None, saved_name=None, role=None, specialty=N
     if saved_name:
         saved_name = f"%{saved_name}%"  # Wildcard search
         query = query.filter(model.saved_name.ilike(saved_name))
+    if student_name:
+        student_name = f"%{student_name}%"  # Wildcard search
+        query = query.filter(model.content.ilike(student_name))
     if role:
         query = query.filter_by(role=role)
     if specialty:
@@ -174,13 +145,14 @@ def get_records(model, search_text=None, saved_name=None, role=None, specialty=N
     return query.all()
 
 def llm_call(model, messages):
+    
     try:
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
-                "Authorization": "Bearer " + st.secrets["OPENROUTER_API_KEY"],
+                "Authorization": "Bearer " + st.secrets["OPENROUTER_API_KEY"],  # Fixed to correct access to secrets
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://fsm-gpt-med-ed.streamlit.app",
+                "HTTP-Referer": "https://fsm-gpt-med-ed.streamlit.app",  # To identify your app
                 "X-Title": "lof-sims",
             },
             data=json.dumps({
@@ -191,12 +163,13 @@ def llm_call(model, messages):
     except requests.exceptions.RequestException as e:
         st.error(f"Error - make sure bills are paid!: {e}")
         return None
+    # Extract the response content
     try:
         response_data = response.json()
     except json.JSONDecodeError:
         st.error(f"Error decoding JSON response: {response.content}")
         return None
-    return response_data
+    return response_data  # Adjusted to match expected JSON structure
 
 def check_password():
     """Returns `True` if the user had the correct password."""
@@ -210,63 +183,22 @@ def check_password():
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
+        # First run, show input for password.
         st.text_input(
             "Password", type="password", on_change=password_entered, key="password"
         )
         st.write("*Please contact David Liebovitz, MD if you need an updated password for access.*")
         return False
     elif not st.session_state["password_correct"]:
+        # Password not correct, show input + error.
         st.text_input(
             "Password", type="password", on_change=password_entered, key="password"
         )
         st.error("😕 Password incorrect")
         return False
     else:
+        # Password correct.
         return True
-
-def generate_checklist_template():
-    checklist_template = """
-    HPI:
-    
-    Onset: 
-    
-    Location: 
-    
-    Duration: 
-    
-    Character:
-    
-    Aggravating/ Alleviating factors: 
-    
-    Radiation: 
-    
-    Timing:
-    
-    Severity:
-    """
-    return checklist_template
-
-def update_checklist_with_answers(user_question, checklist_template):
-    answer_prompt = [
-        {
-            "role": "system",
-            "content": """
-            Based on the case details and the user's question, provide specific answers to populate the checklist. Ensure the answers are detailed and accurate.
-            """
-        },
-        {
-            "role": "user",
-            "content": f"Case details: {st.session_state.final_case}"
-        },
-        {
-            "role": "user",
-            "content": f"User question: {user_question}"
-        }
-    ]
-    answer_response = llm_call(model_choice, answer_prompt)
-    answer_content = answer_response['choices'][0]['message']['content']
-    updated_checklist = checklist_template + "\n\n" + answer_content
-    return updated_checklist
 
 st.title("Case Generator for Simulations")
 init_session()
@@ -305,17 +237,33 @@ if check_password():
         with col1:    
             st.info("**Include desired history in the text paragraph. The AI will generate additional details as needed to draft an educational case.**")
                 
+                
+            # learning_objectives = st.multiselect(
+            #     "Select one or more learning objectives; default is a focused history/examination",
+            #     [
+            #         "Perform a focused history and examination",
+            #         "Provide patient education",
+            #         "Demonstrate effective interpersonal skills",
+            #         "Determine a Dx and DDx",
+            #         "Determine a plan for management",
+            #         "Document the patient case"
+            #     ], default="Perform a focused history and examination",
+            #     help="Choose the learning objectives relevant to this case study."
+            # )
+
             case_study_input = {
+                'Name': st.text_input("Student Name", help="Enter your name here"),
                 'Case Title': st.text_input("Case Study Title", help="Presenting symptom, e.g."),
                 'Case Description': st.text_area("Case Description", height=200, help = "As detailed or brief as desired, e.g., 65F with acute chest pain..."),
                 'Case Primary Diagnosis': st.text_input("Primary Diagnosis", help = "The one or more primary diagnoses, e.g., Pulmonary Embolism"),
             }
             case_study_input = json.dumps(case_study_input)
             with st.expander("Default Learner Tasks", expanded = False):
-                st.markdown(learner_tasks)
+                st.markdown(learner_tasks)  # Display the default tasks
             if st.checkbox("Edit Learner Tasks", value=False, key = "initial_case_edit"):
                 learner_tasks = st.text_area("Learner Tasks for Assessment", height=200, help = "What the learner is expected to do, e.g., Perform a focused history and examination", value = learner_tasks)
             st.session_state.learner_tasks = learner_tasks
+            # final_learner_tasks = st.text_area("Learner Tasks for Assessment", height=200, help = "What the learner is expected to do, e.g., Perform a focused history and examination", value = learner_tasks)
         
         with col1: 
             st.info("Click submit when ready to generate a case!")
@@ -351,33 +299,26 @@ if check_password():
                             st.success("Case Edits Saved!")
                             if edited_new_case:
                                 st.session_state["final_case"] = edited_new_case
+                        # st.session_state.sidebar_state = 'expanded'
                         st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator (including any saved edits)", icon="🧠")
                 else:
                     st.session_state["final_case"] = st.session_state.response_markdown
-
-                if st.button("Generate Checklist for Students"):
-                    st.session_state.checklist_template = generate_checklist_template()
-                    st.success("Checklist Template Generated!")
-                    with st.expander("View Checklist Template", expanded=True):
-                        st.markdown(st.session_state.checklist_template)
-
-                    checklist_html = markdown2.markdown(st.session_state.checklist_template, extras=["tables"])
-                    pdf_path = html_to_pdf(checklist_html, 'checklist_template.pdf')
-                    with open(pdf_path, "rb") as f:
-                        st.download_button("Download Checklist Template PDF", f, "checklist_template.pdf")
-
+                
                 if st.session_state.final_case !="":        
                     case_html = markdown2.markdown(st.session_state.final_case, extras=["tables"])
+                        # st.download_button('Download HTML Case file', html, f'case.html', 'text/html')
                         
-                    if st.checkbox("Generate Case PDF file"):
-                        pdf_path = html_to_pdf(case_html, 'case.pdf')
-                        with open(pdf_path, "rb") as f:
-                            st.download_button("Download Case PDF", f, "case.pdf")
+                    # st.info("Download the Current Case:")
+                    if st.checkbox("Generate Case Word file"):
+                        html_to_doc(case_html, 'case.docx')
+                        with open("case.docx", "rb") as f:
+                            st.download_button("Download Case Word", f, "case.docx")
 
                 if st.session_state["final_case"] != "":
                     if st.button("Send case to the simulator!"):
-                        st.session_state["final_case"] = st.session_state.final_case
+                        st.session_state["final_case"] = st.session_state.final_case  # Ensure the case is correctly set
                         st.session_state["retrieved_name"] = st.session_state.retrieved_name
+                        # st.session_state.sidebar_state = 'expanded'
                         st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator", icon="🧠")
 
         with col3:
@@ -387,6 +328,10 @@ if check_password():
                 if st.checkbox("Save Case to the Database for Future Use"):
                     case_details = st.text_area("Case Details to Save to the Database for Future Use", value=st.session_state.final_case)
                     saved_name = st.text_input("Saved Name (Required to save case)")
+                    # selected_role = st.selectbox("Role", roles)
+                    # specialty = ""
+                    # if selected_role in ["Resident", "Fellow", "Attending"]:
+                    #     specialty = st.text_input("Specialty", "")
 
                     if st.button("Save Case to the Database for future use!"):
                         if saved_name:
@@ -394,12 +339,18 @@ if check_password():
                             st.success("Case Details saved successfully!")
                         else:
                             st.error("Saved Name is required to save the case")
+
+
     
+    
+    # Initialize session state variables
+    # Initialize session state variables
     if "search_results" not in st.session_state:
         st.session_state.search_results = []
     if "selected_case" not in st.session_state:
         st.session_state.selected_case = None
 
+    # Tab2 content for retrieving and selecting cases
     with tab2:
         
         col3, col4 = st.columns([1,3])
@@ -407,13 +358,20 @@ if check_password():
             st.header("Retrieve Records")
             search_text = st.text_input("Search Text")
             search_saved_name = st.text_input("Search by Saved Name")
+            search_student_name = st.text_input("Search by Student Name")
+            # search_role = st.selectbox("Search by Role", [""] + roles)
+            search_role =""
+            search_specialty = ""
+            if search_role in ["Resident", "Fellow", "Attending"]:
+                search_specialty = st.text_input("Search by Specialty", "")
 
             if st.button("Search Cases"):
-                st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name)
+                st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name,search_student_name)
 
             if st.session_state.search_results:
                 st.subheader("Cases Found")
                 for i, case in enumerate(st.session_state.search_results):
+                    # st.write(f"Saved Name: {case.saved_name}, Role: {case.role}, Specialty: {case.specialty}")
                     st.write(f"{i+1}. {case.saved_name}")
                     if st.button(f"View (and Select) Case {i+1}", key=f"select_case_{i}"):
                         st.session_state.selected_case = case
@@ -431,17 +389,20 @@ if check_password():
                         make_new_entry = st.checkbox("If desired, make a database entry when saving edits.", value=False)
                         if make_new_entry:
                             saved_name = st.text_input("Saved Name after edits (Required to save case)")
-                        if st.button("Save Edits for Simulation and Generate a PDF"):
+                        if st.button("Save Edits for Simulation and Generate a Word"):
                             st.session_state.final_case = updated_retrieved_case
                             st.info("Case Edits Saved!")   
                             updated_case_html = markdown2.markdown(st.session_state.final_case, extras=["tables"])
-                            pdf_path = html_to_pdf(updated_case_html, 'updated_case.pdf')
-                            with open(pdf_path, "rb") as f:
-                                st.download_button("Download Updated Case PDF", f, "updated_case.pdf")
+                            html_to_doc(updated_case_html, 'updated_case.docx')
+                            with open("updated_case.docx", "rb") as f:
+                                st.download_button("Download Updated Case Word", f, "updated_case.docx")
                             if make_new_entry:
                                 if saved_name:
                                     save_case_details(st.session_state.final_case, saved_name)
                                     st.success("Case Details saved successfully!")
                                 else:
-                                    st.error("Saved Name is required to save the case")     
+                                    st.error("Saved Name is required to save the case")
+                    # st.session_state.sidebar_state = 'expanded'        
                     st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator ", icon="🧠")
+            
+            
