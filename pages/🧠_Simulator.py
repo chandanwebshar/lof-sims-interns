@@ -187,6 +187,20 @@ def generate_checklist_template(checklist_fields):
         template += f"{field}: {value}\n\n"
     return template
 
+def update_checklist_from_case(case_content):
+    prompt = f"Extract relevant information for the following fields from the given case content: {', '.join(CHECKLIST_FIELDS.keys())}\n\nCase Content:\n{case_content}"
+    response = llm_call("anthropic/claude-3-haiku", [{"role": "user", "content": prompt}])
+    extracted_info = response['choices'][0]['message']['content'].strip().split('\n')
+    
+    checklist_fields = CHECKLIST_FIELDS.copy()
+    for info in extracted_info:
+        field, value = info.split(':', 1)
+        field = field.strip()
+        value = value.strip()
+        if field in checklist_fields:
+            checklist_fields[field] = value
+    return checklist_fields
+
 try:
     extracted_section = extract_patient_door_chart_section(st.session_state.final_case)
     st.info(extracted_section)
@@ -401,90 +415,20 @@ if st.session_state["password_correct"] == True:
     orders = st.sidebar.checkbox("Place Orders/Take Actions", value=False)
     if orders:
         with st.sidebar:
-            # Ensure the 'suggestions_text' key exists in the session state
-            if "suggestions_text" not in st.session_state:
-                # Generating suggestions for the placeholder
-                placeholder_prompt = f"Based on the following case details, list in one word the various medical tests to place, medications to take and lab tests to take:\n\n{st.session_state.final_case}"
-                placeholder_messages = [{"role": "user", "content": placeholder_prompt}]
-                
-                with st.spinner("Generating suggestions..."):
-                    placeholder_results = llm_call("openai/gpt-4o", placeholder_messages)
-                
-                # Get the suggestions to display in the expander
-                if placeholder_results:
-                    st.session_state.suggestions_text = placeholder_results['choices'][0]['message']['content']
-                else:
-                    st.session_state.suggestions_text = "No suggestions available at the moment."
-
-            # Text input for order details without suggestions as placeholder
-            order_details = st.text_input("Order Details", value="", placeholder="E.g., examine lungs, CXR, CBC, furosemide 40 mg IV x 1, consult cardiology, etc.", key="order")
-
-            # Expander to show the suggestions
-            with st.expander("Suggestions for Orders/Actions", expanded=False):
-                suggestions = st.session_state.suggestions_text.split('\n\n')
-                medical_tests = []
-                medications = []
-                lab_tests = []
-
-                # Classify suggestions into categories
-                for suggestion in suggestions:
-                    if "medical" in suggestion.lower():
-                        medical_tests.append(suggestion.strip())
-                    elif "medication" in suggestion.lower() or "med" in suggestion.lower():
-                        medications.append(suggestion.strip())
-                    elif "lab" in suggestion.lower():
-                        lab_tests.append(suggestion.strip())
-
-                checked_suggestions = {
-                    "Medical Tests": [],
-                    "Medications": [],
-                    "Lab Tests": []
-                }
-
-                st.subheader("Medical Tests")
-                for i, suggestion in enumerate(medical_tests):
-                    if suggestion:
-                        if st.checkbox(suggestion, key=f"medical_test_{i}"):
-                            checked_suggestions["Medical Tests"].append(suggestion)
-                
-                st.subheader("Medications")
-                for i, suggestion in enumerate(medications):
-                    if suggestion:
-                        if st.checkbox(suggestion, key=f"medication_{i}"):
-                            checked_suggestions["Medications"].append(suggestion)
-                
-                st.subheader("Lab Tests")
-                for i, suggestion in enumerate(lab_tests):
-                    if suggestion:
-                        if st.checkbox(suggestion, key=f"lab_test_{i}"):
-                            checked_suggestions["Lab Tests"].append(suggestion)
-
+            order_details = st.text_input("E.g., examine lungs, CXR, CBC, furosemide 40 mg IV x 1, consult cardiology, etc.", key="order")
             if st.button("Submit Orders/Take Actions"):
-                # Get the current date and time
                 current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 order_details_with_datetime = f"{order_details}\n\nDate and Time of Request: {current_datetime}"
-                
-                # Update session state with the new orders
-                combined_suggestions = ""
-                for category, suggestions_list in checked_suggestions.items():
-                    if suggestions_list:  # Only add category if there are checked suggestions
-                        combined_suggestions += "\n".join(suggestions_list) + "\n\n"
-            
-                st.session_state.orders_placed = order_details_with_datetime + "\n\n" + combined_suggestions
-
-                # Prompt for orders/actions based on the case details and current orders
+                st.session_state.orders_placed = order_details_with_datetime + "\n\n" + st.session_state.orders_placed
                 prompt = orders_prompt.format(order_details=order_details, case_details=st.session_state.final_case, order_datetime=current_datetime, prior_results=st.session_state.results)
                 orders_messages = [{"role": "user", "content": prompt}]
                 with st.spinner("Transmitting Orders... Please wait."):
                     orders_results = llm_call("openai/gpt-4o", orders_messages)
-                    
                 st.session_state.results = orders_results['choices'][0]['message']['content'] + "\n\n" + st.session_state.results
-                
-            with st.expander("Completed Orders/Actions", expanded=False):
+            with st.expander("Completed Orders/Actions", expanded=False):                
                 st.write(st.session_state.orders_placed)
-                
             with st.expander("All Results of Orders/Actions", expanded=False):
-                st.write(st.session_state.results) 
+                st.write(st.session_state.results)
 
     html2 = markdown2.markdown(st.session_state.conversation_string, extras=["tables"])
     with st.sidebar:

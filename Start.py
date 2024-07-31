@@ -2,6 +2,7 @@ import streamlit as st
 import markdown2
 import json
 import requests
+import fitz  # PyMuPDF for reading PDF files
 from sim_prompts import *  # Ensure this import provides the needed functionality
 from bs4 import BeautifulSoup
 from fpdf import FPDF
@@ -56,7 +57,10 @@ meta = MetaData()
 meta.reflect(bind=engine)
 if 'lab_results' in meta.tables:
     lab_results_table = meta.tables['lab_results']
-    lab_results_table.drop(engine)
+    try:
+        lab_results_table.drop(engine)
+    except Exception as e:
+        st.write(f"Error dropping table lab_results: {e}")
 
 # Create tables
 Base.metadata.create_all(engine)
@@ -97,10 +101,8 @@ class PDF(FPDF):
     def add_list(self, items, is_ordered=False):
         self.set_font("Arial", "", 12)
         for i, item in enumerate(items, start=1):
-            if is_ordered:
-                self.multi_cell(0, 10, f"{i}. {item}")
-            else:
-                self.multi_cell(0, 10, f"- {item}")
+            text = f"{i}. {item}" if is_ordered else f"- {item}"
+            self.multi_cell(0, 10, text)
         self.ln()
 
 def html_to_pdf(html_content, name):
@@ -193,6 +195,8 @@ def init_session():
         st.session_state["selected_lab_result"] = None
     if "search_results" not in st.session_state:
         st.session_state["search_results"] = []
+    if "learner_tasks" not in st.session_state:
+        st.session_state["learner_tasks"] = learner_tasks
 
 # Function to save a transcript
 def save_transcript(transcript_content, role, specialty):
@@ -223,7 +227,7 @@ def save_lab_results(lab_results_content, saved_name):
     st.write(f"Debug: Saved Lab Result - {saved_result.saved_name}: {saved_result.content}")
 
 # Function to retrieve records with full-text search and wildcards
-def get_records(model, search_text=None, saved_name=None, student_name=None, role=None, specialty=None):
+def get_records(model, search_text=None, saved_name=None):
     query = session.query(model)
     if search_text:
         search_text = f"%{search_text}%"  # Wildcard search
@@ -231,17 +235,9 @@ def get_records(model, search_text=None, saved_name=None, student_name=None, rol
     if saved_name:
         saved_name = f"%{saved_name}%"  # Wildcard search
         query = query.filter(model.saved_name.ilike(saved_name))
-    if student_name:
-        student_name = f"%{student_name}%"  # Wildcard search
-        query = query.filter(model.content.ilike(student_name))
-    if role:
-        query = query.filter_by(role=role)
-    if specialty:
-        query = query.filter_by(specialty=specialty)
     return query.all()
 
 def llm_call(model, messages):
-    
     try:
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
@@ -295,6 +291,39 @@ def check_password():
     else:
         # Password correct.
         return True
+
+# Define the checklist fields
+CHECKLIST_FIELDS = {
+    "Onset": "",
+    "Location": "",
+    "Duration": "",
+    "Character": "",
+    "Aggravating/Alleviating factors": "",
+    "Radiation": "",
+    "Timing": "",
+    "Severity": ""
+}
+
+def update_checklist_from_case(case_content):
+    prompt = f"Extract relevant information for the following fields from the given case content: {', '.join(CHECKLIST_FIELDS.keys())}\n\nCase Content:\n{case_content}"
+    response = llm_call("anthropic/claude-3-haiku", [{"role": "user", "content": prompt}])
+    extracted_info = response['choices'][0]['message']['content'].strip().split('\n')
+    
+    checklist_fields = CHECKLIST_FIELDS.copy()
+    for info in extracted_info:
+        if ':' in info:
+            field, value = info.split(':', 1)
+            field = field.strip()
+            value = value.strip()
+            if field in checklist_fields:
+                checklist_fields[field] = value
+    return checklist_fields
+
+def generate_checklist_template(checklist_fields):
+    template = "HPI:\n\n"
+    for field, value in checklist_fields.items():
+        template += f"{field}: {value}\n\n"
+    return template
 
 st.title("Case Generator for Simulations")
 init_session()
@@ -420,6 +449,45 @@ if check_password():
     tab1, tab2, tab3 = st.tabs(["New Case", "Retrieve a Case", "Lab Tests"])
     
     with tab1:
+        # Move file upload section here
+        st.header("Import a Suki File")
+
+        uploaded_file = st.file_uploader("Choose a file", type=["txt", "md", "docx", "pdf"])
+        
+        if uploaded_file is not None:
+            file_content = ""
+            if uploaded_file.type == "text/plain":
+                file_content = uploaded_file.read().decode("utf-8")
+            elif uploaded_file.type == "text/markdown":
+                file_content = uploaded_file.read().decode("utf-8")
+            elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                doc = Document(uploaded_file)
+                file_content = "\n".join([para.text for para in doc.paragraphs])
+            elif uploaded_file.type == "application/pdf":
+                pdf_document = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+                file_content = ""
+                for page_num in range(pdf_document.page_count):
+                    page = pdf_document.load_page(page_num)
+                    file_content += page.get_text("text")
+
+            st.session_state.final_case = file_content
+
+            # Automatically update the checklist from the case content
+            st.session_state.checklist_fields = update_checklist_from_case(file_content)
+            st.session_state.checklist_template = generate_checklist_template(st.session_state.checklist_fields)
+
+            if st.button("Submit Uploaded Case"):
+                messages = [
+                    {"role": "system", "content": f'Using the case details provided (supplemented as needed with additional generated content), comprehensively populate an educational clinical case description in the following specific format: {output_format}'},
+                    {"role": "user", "content": file_content}
+                ]
+                with st.spinner("Assembling Case... Please wait."):
+                    response_content = llm_call(model_choice, messages)
+                if response_content:
+                    st.session_state.response_markdown = response_content['choices'][0]['message']['content']
+                    st.success("Case Study Framework Generated!")
+                else:
+                    st.error("Failed to generate case details. Please try again.")
 
         col1, col2, col3 = st.columns([2, 2, 5])
 
@@ -427,7 +495,6 @@ if check_password():
             st.info("**Include desired history in the text paragraph. The AI will generate additional details as needed to draft an educational case.**")
                 
             case_study_input = {
-                'Name': st.text_input("Student Name", help="Enter your name here"),
                 'Case Title': st.text_input("Case Study Title", help="Presenting symptom, e.g."),
                 'Case Description': st.text_area("Case Description", height=200, help = "As detailed or brief as desired, e.g., 65F with acute chest pain..."),
                 'Case Primary Diagnosis': st.text_input("Primary Diagnosis", help = "The one or more primary diagnoses, e.g., Pulmonary Embolism"),
@@ -441,7 +508,7 @@ if check_password():
         
         with col1: 
             st.info("Click submit when ready to generate a case!")
-            submit_button = st.button("Submit")
+            submit_button = st.button("Submit Case")
 
         if submit_button:
             messages = [
@@ -453,51 +520,69 @@ if check_password():
                 with st.spinner("Assembling Case... Please wait."):
                     response_content = llm_call(model_choice, messages)
             st.session_state.response_markdown = response_content['choices'][0]['message']['content']
-        if st.session_state.response_markdown != "":
-            with col3:
-                st.success("Case Study Framework Generated!")
+            st.success("Case Study Framework Generated!")
+
+        with col3:
+            if st.session_state.response_markdown != "" or st.session_state.final_case != "":
                 with st.expander("View Full Case", expanded=st.session_state.expanded):
-                    st.markdown(st.session_state.response_markdown)
+                    if st.session_state.response_markdown != "":
+                        st.markdown(st.session_state.response_markdown)
+                    else:
+                        # Structure the content
+                        content = st.session_state.final_case
+                        lines = content.split('\n')
+                        structured_content = ""
+                        headers = ["Patient Approach", "History of Present Illness (HPI)", "Past Medical History (PMHx)", "Social History (SHx)", 
+                                   "Family History (FHx)", "Medications and Allergies", "Review of Systems (ROS)", "Physical Examination", 
+                                   "Diagnostic Reasoning", "Teaching Points"]
+                        current_header = None
+
+                        for line in lines:
+                            if any(header in line for header in headers):
+                                current_header = line
+                                structured_content += f"### {line}\n"
+                            else:
+                                if current_header:
+                                    structured_content += f"{line}\n"
+
+                        st.markdown(structured_content)
                     st.session_state.expanded = False
             
-            with col2:
-                st.info("Review and/or edit the case and begin the simulator!")                  
+                with col2:
+                    st.info("Review and/or edit the case and begin the simulator!")                  
             
-                if st.checkbox("Edit Case (Scroll Down)", value=False):
-                    with col3:
+                    if st.checkbox("Edit Case (Scroll Down)", value=False, key="edit_case_checkbox"):
                         st.session_state.expanded = False
                         st.warning("Please edit the case as needed while leaving other characters, e.g., '#' and '*', in place. Use the 'Save Case Edits' button at the bottom to save edits!")
                         
-                        edited_new_case = st.text_area("Click button at bottom to save your edits!", st.session_state.response_markdown, height=1000) 
+                        edited_new_case = st.text_area("Click button at bottom to save your edits!", st.session_state.response_markdown if st.session_state.response_markdown != "" else st.session_state.final_case, height=1000) 
                         if st.button("Save Case Edits for the Simulator"):
                             st.success("Case Edits Saved!")
                             if edited_new_case:
                                 st.session_state["final_case"] = edited_new_case
                         st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator (including any saved edits)", icon="🧠")
-                else:
-                    st.session_state["final_case"] = st.session_state.response_markdown
+                    else:
+                        st.session_state["final_case"] = st.session_state.response_markdown if st.session_state.response_markdown != "" else st.session_state.final_case
                 
-                if st.session_state.final_case !="":        
-                    case_html = markdown2.markdown(st.session_state.final_case, extras=["tables"])
-                        
-                    if st.checkbox("Generate Case PDF file"):
-                        html_to_pdf(case_html, 'case.pdf')
-                        with open("case.pdf", "rb") as f:
-                            st.download_button("Download Case PDF", f, "case.pdf")
-                    if st.checkbox("Generate Case DOCX file"):
-                        html_to_docx(case_html, 'case.docx')
-                        with open("case.docx", "rb") as f:
-                            st.download_button("Download Case DOCX", f, "case.docx")
+                    if st.session_state.final_case !="":        
+                        case_html = markdown2.markdown(st.session_state.final_case, extras=["tables"])
+                            
+                        if st.checkbox("Generate Case PDF file", key="generate_case_pdf"):
+                            html_to_pdf(case_html, 'case.pdf')
+                            with open("case.pdf", "rb") as f:
+                                st.download_button("Download Case PDF", f, "case.pdf")
+                        if st.checkbox("Generate Case DOCX file", key="generate_case_docx"):
+                            html_to_docx(case_html, 'case.docx')
+                            with open("case.docx", "rb") as f:
+                                st.download_button("Download Case DOCX", f, "case.docx")
 
-                if st.session_state["final_case"] != "":
-                    if st.button("Send case to the simulator!"):
-                        st.session_state["final_case"] = st.session_state.final_case
-                        st.session_state["retrieved_name"] = st.session_state.retrieved_name
-                        st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator", icon="🧠")
+                    if st.session_state["final_case"] != "":
+                        if st.button("Send case to the simulator!"):
+                            st.session_state["final_case"] = st.session_state.final_case
+                            st.session_state["retrieved_name"] = st.session_state.retrieved_name
+                            st.session_state["learner_tasks"] = learner_tasks
+                            st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator", icon="🧠")
 
-        with col3:
-            roles = ["1st year medical student", "2nd year medical student", "3rd year medical student", "4th year medical student", "Resident", "Fellow", "Attending"]
-            if st.session_state.final_case:
                 st.divider()
                 if st.checkbox("Save Case to the Database for Future Use"):
                     case_details = st.text_area("Case Details to Save to the Database for Future Use", value=st.session_state.final_case)
@@ -509,7 +594,7 @@ if check_password():
                             st.success("Case Details saved successfully!")
                         else:
                             st.error("Saved Name is required to save the case")
-    
+
     if "search_results" not in st.session_state:
         st.session_state.search_results = []
     if "selected_case" not in st.session_state:
@@ -523,14 +608,14 @@ if check_password():
             st.header("Retrieve Records")
             search_text = st.text_input("Search Text")
             search_saved_name = st.text_input("Search by Saved Name")
-            search_student_name = st.text_input("Search by Student Name")
             search_role =""
             search_specialty = ""
             if search_role in ["Resident", "Fellow", "Attending"]:
                 search_specialty = st.text_input("Search by Specialty", "")
 
             if st.button("Search Cases"):
-                st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name,search_student_name)
+                st.session_state.search_results = get_records(CaseDetails, search_text, search_saved_name)
+
             if st.session_state.search_results:
                 st.subheader("Cases Found")
                 for i, case in enumerate(st.session_state.search_results, start=1):
@@ -544,11 +629,11 @@ if check_password():
                         st.write(f'Here is the retrieved case name: {st.session_state.selected_case.saved_name}')
                         st.write(st.session_state.selected_case.content)
                         st.session_state.final_case = st.session_state.selected_case.content
-                    if st.checkbox("Edit Retrieved Case (Scroll Down)", value=False, key = "retrieved_case_edit"):
+                    if st.checkbox("Edit Retrieved Case (Scroll Down)", value=False, key="retrieved_case_edit"):
                         st.session_state.expanded = False
                         st.warning('Please edit the case as needed while leaving other characters, e.g., "#" and "*", in place. Remember to update the Door Chart section at the bottom!')
                         updated_retrieved_case = st.text_area("Edit Case, enter control-enter or command-enter to save edits!", st.session_state.selected_case.content, height=1000)
-                        make_new_entry = st.checkbox("If desired, make a database entry when saving edits.", value=False)
+                        make_new_entry = st.checkbox("If desired, make a database entry when saving edits.", value=False, key="make_new_entry_checkbox")
                         if make_new_entry:
                             saved_name = st.text_input("Saved Name after edits (Required to save case)")
                         if st.button("Save Edits for Simulation and Generate a PDF"):
@@ -570,7 +655,7 @@ if check_password():
                                     st.error("Saved Name is required to save the case")
                     st.page_link("pages/🧠_Simulator.py", label="Wake the Simulator ", icon="🧠")
 
-# Changes made by Tanaya
+   # Changes made by Tanaya
     # Tab3
     with tab3:
         st.header("Generate Lab Test Results")
@@ -594,12 +679,16 @@ if check_password():
                 df["Select"] = True  # Default to all selected
                 edited_df = st.data_editor(df, use_container_width=True, height=200)  # Adjust height
 
-                edited_rows = st.session_state.get('data_editor', {}).get('edited_rows', {})
-                for row_index, changes in edited_rows.items():
-                    diagnosis = df.at[row_index, 'Panel']
-                    test = df.at[row_index, 'Test']
-                    if not changes['Select']:
-                        st.session_state.selected_tests[diagnosis].remove(test)
+                # Filter selected tests based on user input
+                selected_tests = {}
+                for i, row in edited_df.iterrows():
+                    if row['Select']:
+                        diagnosis = row['Panel']
+                        test = row['Test']
+                        if diagnosis not in selected_tests:
+                            selected_tests[diagnosis] = []
+                        selected_tests[diagnosis].append(test)
+                st.session_state.selected_tests = selected_tests
 
         with col2:
             prompt = st.text_area("Specify details for LLM to generate lab results with normality or abnormality", height=232, key="global_prompt")  # Adjust height
@@ -609,12 +698,11 @@ if check_password():
             if st.button("Generate Lab Test Results"):
                 if primary_diagnosis:
                     all_lab_results = ""
-                    for diagnosis in selected_diagnoses:
-                        selected_tests = st.session_state.selected_tests.get(diagnosis, [])
-                        if selected_tests:
+                    for diagnosis, tests in st.session_state.selected_tests.items():
+                        if tests:
                             messages = [
                                 {"role": "system", "content": "You are an AI that generates realistic lab test results based on the provided primary diagnosis and selected tests."},
-                                {"role": "user", "content": f"Primary Diagnosis: {primary_diagnosis}\nSelected Tests: {json.dumps(selected_tests)}\nDetails: {prompt}"}
+                                {"role": "user", "content": f"Primary Diagnosis: {primary_diagnosis}\nSelected Tests: {json.dumps(tests)}\nDetails: {prompt}"}
                             ]
                             with st.spinner(f"Generating lab test results for {diagnosis}..."):
                                 response_content = llm_call(model_choice, messages)
