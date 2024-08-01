@@ -14,8 +14,9 @@ import requests
 import json
 import base64
 import random
-from Start import llm_call, PDF 
+from Start import llm_call, PDF,ChecklistScore,session
 
+# Update CHECKLIST_FIELDS with the new fields
 CHECKLIST_FIELDS = {
     "Onset": "",
     "Location": "",
@@ -24,19 +25,26 @@ CHECKLIST_FIELDS = {
     "Aggravating/Alleviating factors": "",
     "Radiation": "",
     "Timing": "",
-    "Severity": ""
-}
-
-QUESTION_TO_FIELD_MAPPING = {
-    "onset": "Onset",
-    "location": "Location",
-    "duration": "Duration",
-    "character": "Character",
-    "aggravating": "Aggravating/Alleviating factors",
-    "alleviating": "Aggravating/Alleviating factors",
-    "radiation": "Radiation",
-    "timing": "Timing",
-    "severity": "Severity"
+    "Severity": "",
+    "Additional context": "",
+    "Active problems": "",
+    "Inactive problems": "",
+    "Hospitalizations": "",
+    "Surgical History": "",
+    "Immunizations": "",
+    "Tobacco": "",
+    "Alcohol": "",
+    "Substances": "",
+    "Diet": "",
+    "Exercise": "",
+    "Sexual activity": "",
+    "Home life/safety": "",
+    "Mood": "",
+    "Context": "",
+    "Parents": "",
+    "Siblings": "",
+    "Medications": "",
+    "Allergies": ""
 }
 
 def assign_random_voice(sex):
@@ -79,7 +87,6 @@ def transcript_to_pdf(html_content, name):
             pdf.add_page()
     
     pdf.output(name, 'F')
-
 
 def html_to_pdf(html_content, name):
     try:
@@ -168,23 +175,50 @@ def infer_checklist_field(question):
     prompt = f"Which field does the following question relate to?\n\nQuestion: {question}\n\nFields: {', '.join(CHECKLIST_FIELDS.keys())}\n\nAnswer with the most relevant field:, the response should only contain the relevant feild name"
     response = llm_call("anthropic/claude-3-haiku", [{"role": "user", "content": prompt}])
     inferred_field = response['choices'][0]['message']['content'].strip()
-    print(inferred_field)
     if inferred_field in CHECKLIST_FIELDS:
         return inferred_field
     return None
 
 def update_checklist_with_answer(question, answer, checklist_fields):
-    field = infer_checklist_field(question)
-    if field:
-        checklist_fields[field] = answer
-    else:
-        print("No Match detected")
- 
+    inferred_field = infer_checklist_field(question)
+    if inferred_field:
+        if checklist_fields[inferred_field]:
+            checklist_fields[inferred_field] += f"; {answer}"
+        else:
+            checklist_fields[inferred_field] = answer
 
 def generate_checklist_template(checklist_fields):
     template = "HPI:\n\n"
-    for field, value in checklist_fields.items():
-        template += f"{field}: {value}\n\n"
+    template += f"Onset: {checklist_fields['Onset']}\n\n"
+    template += f"Location: {checklist_fields['Location']}\n\n"
+    template += f"Duration: {checklist_fields['Duration']}\n\n"
+    template += f"Character: {checklist_fields['Character']}\n\n"
+    template += f"Aggravating/Alleviating factors: {checklist_fields['Aggravating/Alleviating factors']}\n\n"
+    template += f"Radiation: {checklist_fields['Radiation']}\n\n"
+    template += f"Timing: {checklist_fields['Timing']}\n\n"
+    template += f"Severity: {checklist_fields['Severity']}\n\n"
+    template += f"Additional context: {checklist_fields['Additional context']}\n\n"
+    template += "\nPMHx:\n\n"
+    template += f"Active problems: {checklist_fields['Active problems']}\n\n"
+    template += f"Inactive problems: {checklist_fields['Inactive problems']}\n\n"
+    template += f"Hospitalizations: {checklist_fields['Hospitalizations']}\n\n"
+    template += f"Surgical History: {checklist_fields['Surgical History']}\n\n"
+    template += f"Immunizations: {checklist_fields['Immunizations']}\n\n"
+    template += "\nSHx:\n\n"
+    template += f"Tobacco: {checklist_fields['Tobacco']}\n\n"
+    template += f"Alcohol: {checklist_fields['Alcohol']}\n\n"
+    template += f"Substances: {checklist_fields['Substances']}\n\n"
+    template += f"Diet: {checklist_fields['Diet']}\n\n"
+    template += f"Exercise: {checklist_fields['Exercise']}\n\n"
+    template += f"Sexual activity: {checklist_fields['Sexual activity']}\n\n"
+    template += f"Home life/safety: {checklist_fields['Home life/safety']}\n\n"
+    template += f"Mood: {checklist_fields['Mood']}\n\n"
+    template += f"Context: {checklist_fields['Context']}\n\n"
+    template += "\nFHx:\n\n"
+    template += f"Parents: {checklist_fields['Parents']}\n\n"
+    template += f"Siblings: {checklist_fields['Siblings']}\n\n"
+    template += f"\nMedications: {checklist_fields['Medications']}\n\n"
+    template += f"\nAllergies: {checklist_fields['Allergies']}\n\n"
     return template
 
 def update_checklist_from_case(case_content):
@@ -239,16 +273,40 @@ if st.session_state["password_correct"] == True:
             st.session_state.checklist_template = generate_checklist_template(st.session_state.checklist_fields)
 
         st.sidebar.subheader("Checklist")
-        st.sidebar.markdown(st.session_state.checklist_template)
+        
+        checklist_placeholder = st.sidebar.empty()
+        checklist_placeholder.markdown(st.session_state.checklist_template)
 
-        if st.sidebar.button("Update and generate PDF"):
-            checklist_html = markdown2.markdown(st.session_state.checklist_template, extras=["tables"])
-            pdf_path = html_to_pdf(checklist_html, 'checklist.pdf')
-            if pdf_path:
-                with open(pdf_path, "rb") as f:
-                    st.download_button("Download Checklist PDF", f, "checklist.pdf")
-            else:
-                st.error("Failed to create checklist PDF.")
+        # Change the button text to "Update"
+        if st.sidebar.button("Update"):
+            st.session_state.checklist_template = generate_checklist_template(st.session_state.checklist_fields)
+            checklist_placeholder.markdown(st.session_state.checklist_template)
+
+        # Add the "Submit" button
+        if st.sidebar.button("Submit"):
+            st.session_state.show_modal = True
+
+    if "show_modal" in st.session_state and st.session_state.show_modal:
+        with st.form("student_info_form", clear_on_submit=True):
+            st.subheader("Enter Student Information")
+            student_name = st.text_input("Student Name")
+            case_name = st.text_input("Case Name")
+            submit_info = st.form_submit_button("Submit")
+            if submit_info:
+                st.session_state.show_modal = False
+                st.session_state.student_name = student_name
+                st.session_state.case_name = case_name
+
+                # Score the student
+                filled_fields = sum(1 for value in st.session_state.checklist_fields.values() if value)
+                total_fields = len(st.session_state.checklist_fields)
+                score = (filled_fields / total_fields) * 100
+
+                checklist_score = ChecklistScore(student_name=student_name, case_name=case_name, score=score)
+                session.add(checklist_score)
+                session.commit()
+
+                st.success(f"Student {student_name} completed the case {case_name} with a score of {score:.2f}%.")
 
     if "sim_response" not in st.session_state:
         st.session_state["sim_response"] = ""
@@ -333,7 +391,7 @@ if st.session_state["password_correct"] == True:
 
             # Update the checklist template with the new answers
             st.session_state.checklist_template = generate_checklist_template(st.session_state.checklist_fields)
-
+            checklist_placeholder.markdown(st.session_state.checklist_template)  # Update sidebar checklist
     else:
         with st.sidebar:
             st.info("Click the green person-icon, pause 3 seconds, and begin to speak with natural speech.\
@@ -399,7 +457,7 @@ if st.session_state["password_correct"] == True:
 
                 # Update the checklist template with the new answers
                 st.session_state.checklist_template = generate_checklist_template(st.session_state.checklist_fields)
-    
+                checklist_placeholder.markdown(st.session_state.checklist_template)  # Update sidebar checklist
     if st.session_state.audio_off == False:
         if st.session_state.sim_response:
             with st.spinner("Synthesizing audio... Please wait."):

@@ -52,6 +52,16 @@ class LabResults(Base):
     content = Column(Text, nullable=False)
     __table_args__ = (Index('lab_results_content_idx', 'content'),)
 
+## Define model for checklist score table
+class ChecklistScore(Base):
+    __tablename__ = 'checklist_score'
+    id = Column(Integer, primary_key=True)
+    student_name = Column(String)
+    case_name = Column(String)
+    score = Column(Integer)
+    date = Column(String)
+    
+
 # Drop existing lab_results table if it exists
 meta = MetaData()
 meta.reflect(bind=engine)
