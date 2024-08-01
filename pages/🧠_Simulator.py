@@ -15,6 +15,7 @@ import json
 import base64
 import random
 from Start import llm_call,PDF,ChecklistScore,session
+from docx import Document
 
 # Update CHECKLIST_FIELDS with the new fields
 CHECKLIST_FIELDS = {
@@ -608,3 +609,27 @@ if st.session_state["password_correct"] == True:
             if pdf_path:
                 with open(pdf_path, "rb") as f:
                     st.download_button("Download Updated Checklist PDF", f, "updated_checklist.pdf")
+
+#sprint3
+with st.sidebar:
+            selected_option = st.selectbox(
+                "Select an option",
+                ["Combined Word Doc", "Combined PDF"]
+            )
+
+            if st.button("Generate Combined Doc"):
+                checklist_html = markdown2.markdown(st.session_state.get("checklist_template", ""), extras=["tables"])
+                assessment_html = markdown2.markdown(st.session_state.get("assessment", ""), extras=["tables"]) if st.session_state.get("assessment") else ""
+                orders_html = markdown2.markdown(st.session_state.get("orders_placed", ""), extras=["tables"]) if st.session_state.get("orders_placed") else ""
+
+                if selected_option == "Combined Word Doc":
+                    combined_doc_path = generate_combined_doc(checklist_html, assessment_html, orders_html, 'combined.docx')
+                    if combined_doc_path:
+                        with open(combined_doc_path, "rb") as f:
+                            st.download_button("Download Combined Document", f, "combined.docx")
+
+                elif selected_option == "Combined PDF":
+                    combined_pdf_path = generate_combined_pdf(checklist_html, assessment_html, orders_html, 'combined.pdf')
+                    if combined_pdf_path:
+                        with open(combined_pdf_path, "rb") as f:
+                            st.download_button("Download Combined Document", f, "combined.pdf")
