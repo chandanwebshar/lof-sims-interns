@@ -14,7 +14,7 @@ import requests
 import json
 import base64
 import random
-from Start import llm_call, PDF,ChecklistScore,session
+from Start import llm_call,PDF,ChecklistScore,session
 
 # Update CHECKLIST_FIELDS with the new fields
 CHECKLIST_FIELDS = {
@@ -87,6 +87,66 @@ def transcript_to_pdf(html_content, name):
             pdf.add_page()
     
     pdf.output(name, 'F')
+
+#sprint 3
+def generate_combined_doc(checklist_html, assessment_html, orders_html, filename):
+    doc = Document()
+
+    def clean_html(html_content):
+        soup = BeautifulSoup(html_content, "html.parser")
+        return soup.get_text(separator="\n")
+
+    # Add checklist content
+    if checklist_html:
+        cleaned_checklist = clean_html(checklist_html)
+        doc.add_paragraph(cleaned_checklist)
+
+    # Add assessment content
+    if assessment_html:
+        cleaned_assessment = clean_html(assessment_html)
+        doc.add_paragraph(cleaned_assessment)
+
+    # Add orders content
+    if orders_html:
+        cleaned_orders = clean_html(orders_html)
+        doc.add_paragraph(cleaned_orders)
+
+    doc.save(filename)
+    return filename
+
+def generate_combined_pdf(checklist_html, assessment_html, orders_html, filename):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_font("Arial", size=12)
+
+    def clean_html(html_content):
+        soup = BeautifulSoup(html_content, "html.parser")
+        return soup.get_text(separator="\n")
+
+    def add_section_heading(pdf, heading):
+        pdf.set_font("Arial", 'B', 14)
+        pdf.cell(0, 10, heading, ln=True, align='C')
+        pdf.set_font("Arial", size=12)
+        pdf.ln(5)  # Add some space after the heading
+
+    if checklist_html:
+        add_section_heading(pdf, "Checklist")
+        cleaned_checklist = clean_html(checklist_html)
+        pdf.multi_cell(0, 4, cleaned_checklist)
+    if assessment_html:
+        pdf.add_page()
+        add_section_heading(pdf, "Assessment")
+        cleaned_assessment = clean_html(assessment_html)
+        pdf.multi_cell(0, 4, cleaned_assessment)
+    if orders_html:
+        pdf.add_page()
+        add_section_heading(pdf, "Orders")
+        cleaned_orders = clean_html(orders_html)
+        pdf.multi_cell(0, 4, cleaned_orders)
+
+    pdf.output(filename)
+    return filename
 
 def html_to_pdf(html_content, name):
     try:
