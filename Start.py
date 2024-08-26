@@ -11,6 +11,13 @@ from sqlalchemy import create_engine, Column, Integer, String, Text, MetaData, I
 from sqlalchemy.orm import sessionmaker, declarative_base
 import pandas as pd
 
+st.set_page_config(
+    page_title='Simulated Case Generator',
+    page_icon='🌌',
+    layout="wide",
+    initial_sidebar_state='auto'
+)
+
 # Database setup
 DATABASE_URL = "sqlite:///app_data.db"  # SQLite database
 
@@ -75,12 +82,6 @@ if 'lab_results' in meta.tables:
 # Create tables
 Base.metadata.create_all(engine)
 
-st.set_page_config(
-    page_title='Simulated Case Generator',
-    page_icon='🌌',
-    layout="wide",
-    initial_sidebar_state='auto'
-)
 with st.sidebar:
     st.image("static/er_bays.jpeg", use_column_width=True)
 
