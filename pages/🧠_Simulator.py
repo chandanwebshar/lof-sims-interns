@@ -62,6 +62,7 @@ def assign_random_voice(sex):
 
 def transcript_to_pdf(html_content, name):   
     html_content = html_content.replace('🤒', 'Patient').replace('👩‍⚕️', 'Doctor')
+    html_content = html_content.encode('utf-8').decode('latin-1')
     html_content = html_content.encode('latin-1', 'ignore').decode('latin-1')
     soup = BeautifulSoup(html_content, "html.parser")
     title = "Patient Case"
